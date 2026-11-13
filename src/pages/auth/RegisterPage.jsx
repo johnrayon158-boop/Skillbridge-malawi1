@@ -73,7 +73,10 @@ export default function RegisterPage() {
         throw new Error(result.error)
       }
 
-      setSuccess('Account created successfully. Please log in to continue.')
+      const needsEmailConfirmation = !result.data?.session
+      setSuccess(needsEmailConfirmation
+        ? 'Check your email for a confirmation link before signing in. If you already registered, use Forgot password.'
+        : 'Account created successfully. Please log in to continue.')
       setForm({
         fullName: '',
         email: '',
@@ -83,7 +86,9 @@ export default function RegisterPage() {
         role: 'student',
       })
 
-      setTimeout(() => navigate('/login'), 1500)
+      if (!needsEmailConfirmation) {
+        setTimeout(() => navigate('/login'), 1500)
+      }
     } catch (registerError) {
       setError(registerError.message || 'Unable to create your account. Please try again.')
     } finally {

@@ -10,6 +10,10 @@ export function getFriendlyAuthError(error) {
 
   const normalized = `${code} ${message}`.toLowerCase()
 
+  if (normalized.includes('email_not_confirmed') || normalized.includes('email not confirmed')) {
+    return 'Please confirm your email address before signing in. Check your inbox for the confirmation link.'
+  }
+
   if (normalized.includes('invalid login') || normalized.includes('invalid credentials') || normalized.includes('email or password')) {
     return 'Email or password is incorrect.'
   }
