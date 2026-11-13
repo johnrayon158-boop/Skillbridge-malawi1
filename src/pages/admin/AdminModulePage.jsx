@@ -259,16 +259,24 @@ function EmployerVerificationReviewsView() {
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    adminService.getEmployerVerificationSubmissions(status)
-      .then((result) => {
+
+    const loadSubmissions = async () => {
+      setLoading(true)
+
+      try {
+        const result = await adminService.getEmployerVerificationSubmissions(status)
         if (active) {
           setSubmissions(result)
           setError('')
         }
-      })
-      .catch((loadError) => { if (active) setError(loadError.message || 'Unable to load employer verification submissions.') })
-      .finally(() => { if (active) setLoading(false) })
+      } catch (loadError) {
+        if (active) setError(loadError.message || 'Unable to load employer verification submissions.')
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadSubmissions()
     return () => { active = false }
   }, [status, refreshKey])
 
@@ -3407,18 +3415,24 @@ function InterviewPolicyReportsView() {
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    adminService.getInterviewPolicyReports(status)
-      .then((result) => {
+
+    const loadReports = async () => {
+      setLoading(true)
+
+      try {
+        const result = await adminService.getInterviewPolicyReports(status)
         if (!active) return
         setReports(result)
         setLoadError(null)
         setUpdatedAt(Date.now())
-      })
-      .catch((error) => {
+      } catch (error) {
         if (active) setLoadError(error)
-      })
-      .finally(() => { if (active) setLoading(false) })
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadReports()
     return () => { active = false }
   }, [status, refreshKey])
 

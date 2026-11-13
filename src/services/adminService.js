@@ -105,11 +105,6 @@ function unavailableSystemHealth(message, apiStatus = 'unavailable') {
   }
 }
 
-async function list(table, query = (request) => request) {
-  const { data, error } = await query(supabase.from(table).select('*'))
-  return requireData(data, error, `Unable to load ${table}.`)
-}
-
 async function recentRows(table, columns, limit = 20) {
   const { data, error } = await supabase.from(table).select(columns).order('created_at', { ascending: false }).limit(limit)
   return requireData(data, error, `Unable to load ${table}.`)

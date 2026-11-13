@@ -895,63 +895,88 @@ function AssessmentsView({ userId, detailId }) {
 
   useEffect(() => {
     let active = true
-    Promise.allSettled([
-      assessmentService.getLibrary(userId),
-      assessmentService.getResults(userId),
-    ]).then(([libraryResult, resultList]) => {
-      if (!active) return
-      const errors = [libraryResult, resultList]
-        .filter((entry) => entry.status === 'rejected')
-        .map((entry) => entry.reason?.message || 'Unable to load assessments.')
-      setLibraryData({
-        userId,
-        key: retry,
-        assessments: libraryResult.status === 'fulfilled' ? libraryResult.value || [] : [],
-        results: resultList.status === 'fulfilled' ? resultList.value || [] : [],
-        error: errors.join(' '),
-      })
-    })
+
+    const loadLibrary = async () => {
+      try {
+        const [libraryResult, resultList] = await Promise.allSettled([
+          assessmentService.getLibrary(userId),
+          assessmentService.getResults(userId),
+        ])
+
+        if (!active) return
+
+        const errors = [libraryResult, resultList]
+          .filter((entry) => entry.status === 'rejected')
+          .map((entry) => entry.reason?.message || 'Unable to load assessments.')
+
+        setLibraryData({
+          userId,
+          key: retry,
+          assessments: libraryResult.status === 'fulfilled' ? libraryResult.value || [] : [],
+          results: resultList.status === 'fulfilled' ? resultList.value || [] : [],
+          error: errors.join(' '),
+        })
+      } catch {
+        if (active) {
+          setLibraryData({ userId, key: retry, assessments: [], results: [], error: 'Unable to load assessments.' })
+        }
+      }
+    }
+
+    void loadLibrary()
     return () => { active = false }
   }, [userId, retry])
 
   useEffect(() => {
     let active = true
-    setAssessment(null)
-    setResult(null)
-    setAttempt(null)
-    setAnswers({})
-    setSubmitError('')
-    setAssessmentError('')
-    setResultError('')
-    if (isResultPage) {
-      setLoadingAssessment(false)
-      if (!resultId) {
-        setResultError('The assessment result link is missing an attempt ID.')
-        return () => { active = false }
-      }
-      assessmentService.getResult(resultId, userId)
-        .then((loadedResult) => { if (active) setResult(loadedResult) })
-        .catch((loadError) => {
+
+    const loadAssessment = async () => {
+      setAssessment(null)
+      setResult(null)
+      setAttempt(null)
+      setAnswers({})
+      setSubmitError('')
+      setAssessmentError('')
+      setResultError('')
+
+      if (isResultPage) {
+        setLoadingAssessment(false)
+
+        if (!resultId) {
+          if (active) setResultError('The assessment result link is missing an attempt ID.')
+          return
+        }
+
+        try {
+          const loadedResult = await assessmentService.getResult(resultId, userId)
+          if (active) setResult(loadedResult)
+        } catch (loadError) {
           if (active) setResultError(loadError.message || 'Unable to load this assessment result.')
-        })
-      return () => { active = false }
-    }
-    if (!detailId) {
-      setLoadingAssessment(false)
-      return () => { active = false }
-    }
-    setLoadingAssessment(true)
-    assessmentService.getAssessment(detailId)
-      .then(async (loadedAssessment) => {
+        }
+        return
+      }
+
+      if (!detailId) {
+        setLoadingAssessment(false)
+        return
+      }
+
+      setLoadingAssessment(true)
+
+      try {
+        const loadedAssessment = await assessmentService.getAssessment(detailId)
         const startedAttempt = await assessmentService.startAssessmentAttempt(detailId, attemptRequestId)
         if (!active) return
         setAssessment(loadedAssessment)
         setAttempt(startedAttempt)
-      })
-      .catch((loadError) => {
+      } catch (loadError) {
         if (active) setAssessmentError(loadError.message || 'Unable to load this assessment.')
-      })
-      .finally(() => { if (active) setLoadingAssessment(false) })
+      } finally {
+        if (active) setLoadingAssessment(false)
+      }
+    }
+
+    void loadAssessment()
     return () => { active = false }
   }, [userId, detailId, isResultPage, resultId, retry, attemptRequestId])
 
@@ -1661,14 +1686,22 @@ function JobDetailView({ userId, jobId, candidateType = 'student' }) {
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    setError('')
-    jobService.getJob(jobId, candidateType)
-      .then((loadedJob) => { if (active) setJob(loadedJob) })
-      .catch((loadError) => {
+
+    const loadJob = async () => {
+      setLoading(true)
+      setError('')
+
+      try {
+        const loadedJob = await jobService.getJob(jobId, candidateType)
+        if (active) setJob(loadedJob)
+      } catch (loadError) {
         if (active) setError(loadError.message || 'Unable to load this job.')
-      })
-      .finally(() => { if (active) setLoading(false) })
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadJob()
     return () => { active = false }
   }, [jobId, candidateType])
   if (loading) return <div className="h-80 animate-pulse rounded-2xl bg-slate-100" />

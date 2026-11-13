@@ -28,20 +28,29 @@ export default function EvaluationPage() {
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    setError('')
-    setNotice('')
-    evaluationService.getMyEvaluation(user.id, workflow)
-      .then((response) => {
+
+    const loadEvaluation = async () => {
+      setLoading(true)
+      setError('')
+      setNotice('')
+
+      try {
+        const response = await evaluationService.getMyEvaluation(user.id, workflow)
         if (!active) return
+
         setAnswers(response
           ? Object.fromEntries(QUESTIONS.map(([field]) => [field, response[field] || 0]))
           : EMPTY_ANSWERS)
         setFeedback(response?.feedback || '')
         setSavedAt(response?.submitted_at || '')
-      })
-      .catch((loadError) => { if (active) setError(loadError.message || 'Unable to load your evaluation.') })
-      .finally(() => { if (active) setLoading(false) })
+      } catch (loadError) {
+        if (active) setError(loadError.message || 'Unable to load your evaluation.')
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadEvaluation()
     return () => { active = false }
   }, [user.id, workflow])
 

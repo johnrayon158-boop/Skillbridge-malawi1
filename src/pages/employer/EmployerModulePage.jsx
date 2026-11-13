@@ -1149,11 +1149,29 @@ function ApplicationsView({ employerId, applicationId }) {
   }, [employerId])
   useEffect(() => {
     if (applicationId) return undefined
+
     let active = true
-    setLoading(true)
-    employerService.getDashboard(employerId)
-      .then((result) => { if (active) { setApplications(result.applications || []); setError(''); setLoading(false) } })
-      .catch((loadError) => { if (active) { setError(loadError.message || 'Unable to load applications.'); setLoading(false) } })
+    const loadApplications = async () => {
+      setLoading(true)
+
+      try {
+        const result = await employerService.getDashboard(employerId)
+        if (active) {
+          setApplications(result.applications || [])
+          setError('')
+        }
+      } catch (loadError) {
+        if (active) {
+          setError(loadError.message || 'Unable to load applications.')
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadApplications()
     return () => { active = false }
   }, [employerId, applicationId])
   const update = async (id, nextStatus) => {
@@ -1300,10 +1318,28 @@ function RecruitmentView({ employerId }) {
   }, [employerId])
   useEffect(() => {
     let active = true
-    setLoading(true)
-    employerService.getDashboard(employerId)
-      .then((result) => { if (active) { setApplications(result.applications || []); setError(''); setLoading(false) } })
-      .catch((loadError) => { if (active) { setError(loadError.message || 'Unable to load the recruitment pipeline.'); setLoading(false) } })
+
+    const loadPipeline = async () => {
+      setLoading(true)
+
+      try {
+        const result = await employerService.getDashboard(employerId)
+        if (active) {
+          setApplications(result.applications || [])
+          setError('')
+        }
+      } catch (loadError) {
+        if (active) {
+          setError(loadError.message || 'Unable to load the recruitment pipeline.')
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadPipeline()
     return () => { active = false }
   }, [employerId])
   const advance = async (application) => {
@@ -1685,20 +1721,30 @@ function InterviewsView({ employerId }) {
   }, [employerId])
   useEffect(() => {
     let active = true
-    setLoading(true)
-    Promise.all([interviewService.list(employerId), employerService.getDashboard(employerId)])
-      .then(([interviewList, dashboard]) => {
+
+    const loadInterviews = async () => {
+      setLoading(true)
+
+      try {
+        const [interviewList, dashboard] = await Promise.all([
+          interviewService.list(employerId),
+          employerService.getDashboard(employerId),
+        ])
+
         if (active) {
           setInterviews(interviewList)
           setApplications(dashboard.applications || [])
           setCurrentTime(Date.now())
           setError('')
         }
-      })
-      .catch((loadError) => {
+      } catch (loadError) {
         if (active) setError(loadError.message || 'Unable to load interviews.')
-      })
-      .finally(() => { if (active) setLoading(false) })
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadInterviews()
     return () => { active = false }
   }, [employerId])
   const eligibleApplications = applications.filter((application) => isApplicationInProgress(application.status))
@@ -1943,7 +1989,31 @@ function FeedbackDashboard({ employerId }) {
     }
   }, [employerId])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    let active = true
+
+    const loadFeedback = async () => {
+      setLoading(true)
+      try {
+        const [candidateList, feedbackList] = await Promise.all([
+          feedbackService.listEligibleCandidates(employerId),
+          feedbackService.listForEmployer(employerId),
+        ])
+
+        if (!active) return
+        setCandidates(candidateList)
+        setFeedback(feedbackList)
+        setError('')
+      } catch (loadError) {
+        if (active) setError(loadError.message || 'Unable to load feedback data.')
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadFeedback()
+    return () => { active = false }
+  }, [employerId])
 
   const updateCompetency = (index, field, value) => {
     setForm((current) => ({
@@ -2188,23 +2258,30 @@ function SimpleEmployerList({ mode, employerId }) {
   }, [employerId, mode])
   useEffect(() => {
     let active = true
-    setLoading(true)
-    const request = mode === 'employees'
-      ? employerService.getDashboard(employerId).then((data) => data.employees || [])
-      : mode === 'analytics'
-        ? analyticsService.getEmployerAnalytics(employerId)
-        : notificationService.list(employerId)
-    request
-      .then((result) => {
+
+    const loadItems = async () => {
+      setLoading(true)
+
+      try {
+        const request = mode === 'employees'
+          ? employerService.getDashboard(employerId).then((data) => data.employees || [])
+          : mode === 'analytics'
+            ? analyticsService.getEmployerAnalytics(employerId)
+            : notificationService.list(employerId)
+
+        const result = await request
         if (active) {
           setItems(result)
           setError('')
         }
-      })
-      .catch((loadError) => {
+      } catch (loadError) {
         if (active) setError(loadError.message || `Unable to load ${mode}.`)
-      })
-      .finally(() => { if (active) setLoading(false) })
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadItems()
     return () => { active = false }
   }, [employerId, mode])
   const titles = { employees: ['Employees', 'No employees have been hired through SkillBridge yet.'], analytics: ['Hiring analytics', 'Not enough data yet.'], notifications: ['Notifications', 'No employer notifications yet.'] }
