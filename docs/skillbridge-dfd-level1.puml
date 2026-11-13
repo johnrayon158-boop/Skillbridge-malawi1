@@ -1,0 +1,55 @@
+@startuml
+title SkillBridge Malawi - Data Flow Diagram (Level 1)
+
+left to right direction
+skinparam linetype ortho
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam wrapWidth 180
+skinparam nodesep 35
+skinparam ranksep 45
+
+rectangle "Student /\nGraduate" as Student
+rectangle "Employer" as Employer
+rectangle "Administrator" as Admin
+
+circle "1.\nAuthenticate\nUser" as Authenticate
+circle "2.\nManage Profile\n& Skills" as Profile
+circle "3.\nAssess Readiness\n& Match Opportunities" as Match
+circle "4.\nManage Applications" as Applications
+circle "5.\nReports &\nAnalytics" as Reports
+
+database "D1\nUser & Profile Data" as UserData
+database "D2\nSkills & Assessment Data" as SkillsData
+database "D3\nJobs & Applications" as OpportunityData
+
+Student <--> Authenticate : sign-in details /\nauthentication result
+Authenticate <--> UserData : account data
+
+Student --> Profile : profile, education\nand skill updates
+Profile --> Student : saved profile\nand progress
+Profile <--> UserData : profile and education data
+Profile <--> SkillsData : skills, evidence\nand assessment results
+
+Profile --> Match : learner profile\nand skill evidence
+Match <--> SkillsData : skill and readiness data
+Match <--> OpportunityData : available opportunities
+Match --> Student : career and job\nrecommendations
+
+Student <--> Applications : applications /\napplication status
+Employer <--> Applications : job listings /\napplicant updates
+Applications <--> OpportunityData : jobs and\napplication records
+
+UserData --> Reports : user and profile data
+SkillsData --> Reports : skills and\nassessment data
+OpportunityData --> Reports : job and\napplication data
+Reports --> Admin : aggregate insights\nand reports
+
+legend bottom
+  rectangle  External entity
+  circle     Process
+  database   Data store
+  arrows     Data flow
+endlegend
+
+@enduml

@@ -1,0 +1,148 @@
+@startuml
+title SkillBridge Malawi - System Architecture and Output Design
+
+left to right direction
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam wrapWidth 210
+skinparam maxMessageSize 90
+
+actor "Student / Graduate" as Student
+actor Employer
+actor Administrator as Admin
+
+rectangle "SkillBridge Malawi" {
+  package "Web application\nReact + Vite" as Web {
+    component "Public pages\nLanding, features,\nemployer information" as PublicUI
+    component "Authentication UI\nSign in, registration,\npassword recovery" as AuthUI
+    component "Student workspace" as StudentUI
+    component "Employer workspace" as EmployerUI
+    component "Admin workspace" as AdminUI
+    component "Shared UI\nDashboards, navigation,\nnotifications, accessibility" as SharedUI
+    component "Frontend service layer\nAuth, profiles, skills, jobs,\napplications, analytics, etc." as WebServices
+    component "Dashboard analytics\nand report generation" as Analytics
+    component "Supabase client\nBrowser publishable key" as SbClient
+  }
+
+  package "Application API\nNode.js" as API {
+    component "HTTP API and\nBearer-token validation" as HttpAPI
+    component "Career and skills API\nRecommendations, skill gaps,\nreadiness, roadmap, simulation" as CareerAPI
+    component "Career assistant\nChat and conversation history" as ChatAPI
+    component "CV analyzer\nDocument parsing and analysis" as CVAPI
+    component "Placement search\nExternal listing aggregation" as PlacementAPI
+    component "Deterministic scoring\nMatching and validation" as Scoring
+    component "AI governance\nExplainability, validation,\nauditing and feedback" as Governance
+  }
+
+  package "Supabase platform" as Supabase {
+    component "Supabase Auth\nIdentity and access tokens" as Auth
+    database "PostgreSQL\nRow-level security, RPCs,\ntriggers and relational data" as DB
+    folder "Supabase Storage\nProfile pictures, company logos,\nCVs, certificates and project media" as Storage
+  }
+}
+
+cloud "Google Gemini\nOptional narrative enrichment" as Gemini
+cloud "External job feeds\nArbeitnow, Remotive, Jobicy" as JobFeeds
+component "CSV report downloads" as CSV
+
+Student --> PublicUI
+Student --> AuthUI
+Student --> StudentUI
+Employer --> PublicUI
+Employer --> AuthUI
+Employer --> EmployerUI
+Admin --> AuthUI
+Admin --> AdminUI
+
+PublicUI --> SharedUI
+AuthUI --> WebServices
+StudentUI --> SharedUI
+EmployerUI --> SharedUI
+AdminUI --> SharedUI
+SharedUI --> WebServices
+StudentUI --> Analytics
+EmployerUI --> Analytics
+AdminUI --> Analytics
+WebServices --> SbClient
+Analytics --> SbClient
+Analytics --> CSV : format and download
+
+SbClient <--> Auth : sign in / token
+SbClient <--> DB : direct authorized data access
+SbClient <--> Storage : upload / retrieve assets
+SbClient --> HttpAPI : HTTPS + access token
+
+HttpAPI --> CareerAPI
+HttpAPI --> ChatAPI
+HttpAPI --> CVAPI
+HttpAPI --> PlacementAPI
+CareerAPI --> Scoring
+CareerAPI --> Governance
+ChatAPI --> Governance
+CVAPI --> Governance
+
+HttpAPI --> Auth : validate user token
+CareerAPI <--> DB : read source data /\nstore results and feedback
+ChatAPI <--> DB : conversation history
+CVAPI <--> DB : document metadata /\nanalysis results
+CVAPI <--> Storage : retrieve CV document
+PlacementAPI --> JobFeeds : fetch and normalize listings
+CareerAPI ..> Gemini : optional explanation
+ChatAPI ..> Gemini : optional assistant response
+CVAPI ..> Gemini : optional document insights
+Governance --> DB : governance events,\naudits and feedback
+note right of StudentUI
+Student outputs:
+- Career recommendations and roadmaps
+- Skills gaps, competency evidence and readiness
+- Assessments and learning pathways
+- Matched jobs, internships and applications
+- CV analysis, interview preparation and progress
+- Notifications and career-assistant responses
+end note
+
+note right of EmployerUI
+Employer outputs:
+- Job and internship management
+- Applicant reviews and recruitment stages
+- Candidate assessments and interviews
+- Offers, employment and organization analytics
+end note
+
+note right of AdminUI
+Administrator outputs:
+- User, employer and content management
+- Labour-market intelligence
+- Aggregate analytics and CSV reports
+- AI monitoring, audit logs and data-quality views
+end note
+
+note bottom of DB
+Core data domains:
+profiles and role profiles; education; skills and evidence;
+careers; assessments and learning; projects and portfolios;
+jobs, applications and recruitment; employment; notifications;
+AI recommendations, feedback and governance records.
+end note
+
+note bottom of HttpAPI
+Server-only secrets (including Gemini and Supabase service-role
+credentials) are not exposed to the browser. Authenticated API
+requests are associated with the verified user.
+end note
+
+note bottom of Analytics
+Dashboards query real platform records through the browser
+Supabase client. Student and employer views are scoped by RLS;
+admin reports use aggregate or authorized administrative data.
+end note
+
+legend bottom
+  -->  Request or data flow
+  <-->  Two-way interaction
+  ..>  Optional external integration
+endlegend
+
+@enduml

@@ -1,0 +1,73 @@
+@startuml
+title SkillBridge Malawi - System Architecture
+
+left to right direction
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam wrapWidth 180
+skinparam nodesep 35
+skinparam ranksep 45
+
+package "Users" as Users {
+  actor "Student /\nGraduate" as Student
+  actor Employer
+  actor Administrator as Admin
+}
+
+package "Frontend\nReact + Vite" as Frontend {
+  component "Student Workspace" as StudentUI
+  component "Employer Workspace" as EmployerUI
+  component "Admin Panel" as AdminUI
+}
+
+package "Business Logic" as Logic {
+  component "Career & Skills\nReadiness and recommendations" as Career
+  component "Opportunities\nJobs, matching and applications" as Opportunities
+  component "Reports & Analytics" as Analytics
+}
+
+package "Data Layer\nSupabase" as Data {
+  component "Authentication" as Auth
+  database "PostgreSQL\nProfiles, skills, jobs,\napplications and results" as DB
+  component "File Storage\nCVs and profile assets" as Storage
+}
+
+package "Backend API Layer\nNode.js" as Backend {
+  component "API Services\nCareer assistant, CV analysis,\nplacements and AI features" as API
+}
+
+cloud "Optional External Services\nGemini AI and job feeds" as External
+
+Student --> StudentUI
+Employer --> EmployerUI
+Admin --> AdminUI
+
+StudentUI --> Career
+StudentUI --> Opportunities
+EmployerUI --> Opportunities
+AdminUI --> Analytics
+Career --> Analytics
+
+StudentUI --> Auth : sign in
+EmployerUI --> Auth : sign in
+AdminUI --> Auth : sign in
+
+Career <--> DB
+Opportunities <--> DB
+Analytics --> DB
+StudentUI <--> Storage : upload / view files
+
+StudentUI --> API : authenticated requests
+API <--> DB
+API <--> Storage
+API ..> External : optional AI / job data
+
+legend bottom
+  -->  Request or data flow
+  <-->  Two-way data exchange
+  ..>  Optional external integration
+endlegend
+
+@enduml
