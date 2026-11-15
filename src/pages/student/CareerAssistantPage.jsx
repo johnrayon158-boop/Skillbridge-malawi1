@@ -4,7 +4,7 @@ import { AppShell } from '../../components/layout/AppShell'
 export default function CareerAssistantPage() {
   return (
     <AppShell title="Career Assistant" subtitle="Ask anything, or get personalized career guidance based on your SkillBridge profile." showBackButton>
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto w-full max-w-7xl">
         <CareerAssistantWidget />
       </div>
     </AppShell>

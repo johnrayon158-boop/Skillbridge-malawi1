@@ -1,4 +1,4 @@
-import { Bot, LoaderCircle, SendHorizonal, Trash2 } from 'lucide-react'
+import { Bot, ChevronDown, ChevronUp, LoaderCircle, SendHorizonal, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -186,6 +186,7 @@ export function CareerAssistantWidget() {
   const [conversations, setConversations] = useState([])
   const [conversationId, setConversationId] = useState(null)
   const [input, setInput] = useState('')
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [error, setError] = useState('')
@@ -423,7 +424,7 @@ export function CareerAssistantWidget() {
   }
 
   return (
-    <div className="flex h-[70dvh] min-h-[360px] max-h-[760px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:h-[70vh] sm:min-h-[440px]">
+    <div className="flex h-[78dvh] min-h-[420px] max-h-[900px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:h-[78vh] sm:min-h-[520px]">
       <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-800">
@@ -434,7 +435,17 @@ export function CareerAssistantWidget() {
             <p className="text-xs text-slate-500">General answers and personalized career guidance</p>
           </div>
         </div>
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
+          <button
+            type="button"
+            aria-expanded={suggestionsOpen}
+            aria-controls="career-assistant-suggestions"
+            onClick={() => setSuggestionsOpen((open) => !open)}
+            className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+          >
+            Questions
+            {suggestionsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
           <label className="sr-only" htmlFor="career-chat-history">Chat history</label>
           <select
             id="career-chat-history"
@@ -459,13 +470,20 @@ export function CareerAssistantWidget() {
         </div>
       </div>
 
-      <div className="overflow-x-auto border-b border-slate-200 bg-sky-50/70 px-3 py-3 sm:px-4">
-        <div role="group" aria-label="Suggested prompts" className="flex w-max flex-nowrap gap-2 sm:w-auto sm:flex-wrap">
+      <div
+        id="career-assistant-suggestions"
+        hidden={!suggestionsOpen}
+        className="border-b border-slate-200 bg-sky-50/70 px-3 py-3 sm:px-4"
+      >
+        <div role="group" aria-label="Suggested prompts" className="flex flex-wrap gap-2">
           {defaultSuggestions.map((suggestion) => (
             <button
               key={suggestion}
               type="button"
-              onClick={() => setInput(suggestion)}
+              onClick={() => {
+                setInput(suggestion)
+                setSuggestionsOpen(false)
+              }}
               className="whitespace-nowrap rounded-full border border-sky-200 bg-white px-3 py-1.5 text-xs font-medium text-sky-700 transition hover:border-sky-300 hover:bg-sky-100"
             >
               {suggestion}
