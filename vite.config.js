@@ -11,6 +11,18 @@ const base = process.env.GITHUB_ACTIONS === 'true' && repositoryName
 export default defineConfig({
   base,
   plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:4000',
+        configure(proxy) {
+          proxy.on('proxyReq', (proxyRequest) => {
+            proxyRequest.removeHeader('origin')
+          })
+        },
+      },
+    },
+  },
   build: {
     rolldownOptions: {
       output: {

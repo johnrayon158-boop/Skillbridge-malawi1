@@ -19,3 +19,7 @@ Before the first deployment:
 
 The Render blueprint configures the API CORS allowlist for the GitHub Pages origin and uses Render's health check at `/health`. GitHub Pages hosts only the static frontend; it does not run this repository's Node server. Frontend `VITE_` values are included in the public build, so do not put server secrets such as service-role keys or AI provider keys in GitHub Actions variables prefixed with `VITE_`.
 
+## Run locally
+
+Run `npm run dev -- --host 0.0.0.0` to start the frontend and API together. The Vite development server proxies `/api` requests to the local API, so the app also works when opened from another device on the same network without adding that device's address to the API CORS allowlist.
+

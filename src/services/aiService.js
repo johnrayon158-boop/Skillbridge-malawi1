@@ -13,7 +13,7 @@ const useConfiguredApi = configuredApiBase && !(import.meta.env.PROD && isLoopba
 const AI_API_BASE = (useConfiguredApi
   ? configuredApiBase
   : import.meta.env.DEV && typeof window !== 'undefined'
-    ? `${window.location.protocol}//${window.location.hostname}:4000`
+    ? window.location.origin
     : typeof window !== 'undefined'
       ? window.location.origin
       : '').replace(/\/+$/, '')
