@@ -72,13 +72,14 @@ test('approved preflight returns the supported methods and headers', async (cont
     headers: {
       Origin: 'https://frontend.example.test',
       'Access-Control-Request-Method': 'POST',
-      'Access-Control-Request-Headers': 'authorization, content-type',
+      'Access-Control-Request-Headers': 'authorization, content-type, x-skillbridge-request-id',
     },
   })
   assert.equal(response.status, 204)
   assert.equal(response.headers.get('access-control-allow-origin'), 'https://frontend.example.test')
   assert.match(response.headers.get('access-control-allow-methods'), /GET, POST, DELETE, OPTIONS/)
-  assert.match(response.headers.get('access-control-allow-headers'), /Authorization, Content-Type/)
+  assert.match(response.headers.get('access-control-allow-headers'), /X-SkillBridge-Request-Id/)
+  assert.equal(response.headers.get('access-control-expose-headers'), 'X-SkillBridge-Request-Id')
   assert.match(response.headers.get('vary'), /Access-Control-Request-Headers/)
 })
 

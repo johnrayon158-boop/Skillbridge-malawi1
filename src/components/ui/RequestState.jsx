@@ -10,7 +10,8 @@ export function RequestError({
   retryLabel = 'Try again',
   stale = false,
 }) {
-  const [referenceId] = useState(createDebugReference)
+  const [fallbackReferenceId] = useState(createDebugReference)
+  const referenceId = error?.requestId || fallbackReferenceId
   const presentation = classifyRequestError(error, { fallback, kind })
 
   useEffect(() => {

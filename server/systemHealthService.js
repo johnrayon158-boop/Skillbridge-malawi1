@@ -89,7 +89,7 @@ export function createSystemIncidentRecorder({
 export function createSystemHealthService({
   supabase,
   geminiApiKey,
-  geminiModel = 'gemini-2.0-flash',
+  geminiModel = 'gemini-3.8-flash',
   rateLimiter,
   emailDeliveryStatus = { configured: false },
   recordIncident = async () => false,

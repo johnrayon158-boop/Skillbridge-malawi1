@@ -1,18 +1,20 @@
 import { requestGeminiJson } from './geminiJson.js'
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+const GEMINI_MODEL = 'gemini-3.8-flash'
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
 
 export function getGeminiStatus() {
   return {
-    enabled: Boolean(process.env.GEMINI_API_KEY),
-    message: process.env.GEMINI_API_KEY
+    enabled: Boolean(geminiApiKey),
+    message: geminiApiKey
       ? 'Gemini is configured.'
       : 'AI recommendations are temporarily unavailable because the Gemini API key is not configured.',
   }
 }
 
 export async function generateGeminiExplanation(prompt, context = {}) {
-  const apiKey = process.env.GEMINI_API_KEY
+  const apiKey = geminiApiKey
   if (!apiKey) {
     return {
       enabled: false,
@@ -29,9 +31,12 @@ export async function generateGeminiExplanation(prompt, context = {}) {
     validate: (value) => typeof value?.explanation === 'string' && value.explanation.trim()
       ? { explanation: value.explanation.trim().slice(0, 4000) }
       : null,
-    send: (input) => fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
+    send: (input) => fetch(GEMINI_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
       body: JSON.stringify({
         contents: [{
           role: 'user',
@@ -42,6 +47,7 @@ export async function generateGeminiExplanation(prompt, context = {}) {
           responseMimeType: 'application/json',
         },
       }),
+      signal: AbortSignal.timeout(20000),
     }),
   })
 
@@ -54,10 +60,11 @@ export async function generateGeminiExplanation(prompt, context = {}) {
   }
 
   console.warn('[ai] Gemini explanation was not usable.', {
-    model: generated.model || 'gemini-2.0-flash',
+    model: generated.model || GEMINI_MODEL,
     responseId: generated.responseId,
     httpStatus: generated.httpStatus,
     reason: generated.reason,
+    providerErrorCode: generated.providerErrorCode,
   })
   return {
     enabled: true,

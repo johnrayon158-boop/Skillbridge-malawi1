@@ -153,7 +153,13 @@ export function createAiRouteHandlers({
         sendJson(res, error.statusCode, errorResponse(error.message, error.statusCode))
         return
       }
-      console.error(`Unable to process AI endpoint: ${error?.message || 'Unknown error'}`)
+      console.error('[ai] Unable to process AI endpoint.', {
+        requestId: req?.skillbridgeRequestId,
+        errorName: error?.name || 'Error',
+        errorCode: typeof error?.code === 'string' && /^[A-Z0-9_-]{2,40}$/i.test(error.code)
+          ? error.code
+          : undefined,
+      })
       sendJson(res, 503, errorResponse('This feature is temporarily unavailable. Please try again later.', 503))
     }
   }

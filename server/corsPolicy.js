@@ -1,5 +1,5 @@
 export const CORS_ALLOWED_METHODS = Object.freeze(['GET', 'POST', 'DELETE', 'OPTIONS'])
-export const CORS_ALLOWED_HEADERS = Object.freeze(['Authorization', 'Content-Type'])
+export const CORS_ALLOWED_HEADERS = Object.freeze(['Authorization', 'Content-Type', 'X-SkillBridge-Request-Id'])
 
 const DEFAULT_DEVELOPMENT_ORIGINS = Object.freeze([
   'http://localhost:5173',
@@ -79,6 +79,7 @@ export function applyCorsPolicy(req, res, policy) {
   res.setHeader('Access-Control-Allow-Origin', normalizedOrigin)
   res.setHeader('Access-Control-Allow-Methods', CORS_ALLOWED_METHODS.join(', '))
   res.setHeader('Access-Control-Allow-Headers', CORS_ALLOWED_HEADERS.join(', '))
+  res.setHeader('Access-Control-Expose-Headers', 'X-SkillBridge-Request-Id')
 
   if (req.method !== 'OPTIONS') return { allowed: true }
 

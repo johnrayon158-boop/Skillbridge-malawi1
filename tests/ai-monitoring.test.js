@@ -83,6 +83,18 @@ test('provider metadata sanitizes provider identifiers and fallback state', () =
   assert.equal(req.aiMonitoring.modelIdentifier, 'gemini-2.5-flash')
   assert.equal(req.aiMonitoring.providerResponseId, null)
   assert.equal(req.aiMonitoring.errorCategory, 'invalid_schema')
+  updateAiProviderMetadata(req, {
+    status: 'unavailable',
+    reason: 'provider_quota',
+    providerErrorCode: 'RESOURCE_EXHAUSTED',
+  }, 'gemini-3.8-flash')
+  assert.equal(req.aiMonitoring.errorCategory, 'provider_quota')
+  updateAiProviderMetadata(req, {
+    status: 'unavailable',
+    reason: 'provider_authentication',
+    providerErrorCode: 'UNAUTHENTICATED',
+  }, 'gemini-3.8-flash')
+  assert.equal(req.aiMonitoring.errorCategory, 'provider_authentication')
   setAiFallbackMetadata(req)
   assert.equal(req.aiMonitoring.modelProvider, 'deterministic-fallback')
   assert.equal(req.aiMonitoring.errorCategory, 'provider_not_configured')

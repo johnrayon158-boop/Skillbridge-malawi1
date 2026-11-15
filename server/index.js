@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import { getEmailDeliveryStatus } from './services/notifications/emailService.js'
@@ -53,11 +54,28 @@ const port = Number(process.env.PORT || process.env.AI_API_PORT || env.PORT || e
 const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
 const supabaseServiceKey = env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 const geminiApiKey = env.GEMINI_API_KEY || env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+const vercelOrigins = [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL]
+  .filter((host) => typeof host === 'string' && /^[A-Za-z0-9.-]+$/.test(host))
+  .map((host) => `https://${host}`)
 const corsPolicy = createCorsPolicy({
-  allowedOrigins: process.env.CORS_ALLOWED_ORIGINS ?? env.CORS_ALLOWED_ORIGINS,
+  allowedOrigins: [
+    process.env.CORS_ALLOWED_ORIGINS ?? env.CORS_ALLOWED_ORIGINS,
+    ...vercelOrigins,
+  ].filter(Boolean).join(','),
   developmentOrigins: process.env.CORS_DEV_ORIGINS ?? env.CORS_DEV_ORIGINS,
   environment: process.env.NODE_ENV || env.NODE_ENV,
 })
+
+const missingServerConfiguration = [
+  !supabaseUrl ? 'SUPABASE_URL' : null,
+  !supabaseServiceKey ? 'SUPABASE_SERVICE_ROLE_KEY' : null,
+  !geminiApiKey ? 'GEMINI_API_KEY' : null,
+].filter(Boolean)
+if (missingServerConfiguration.length) {
+  console.error('[api-config] Required server environment variables are missing.', {
+    variables: missingServerConfiguration,
+  })
+}
 
 const jobFeedCache = new Map()
 const JOB_FEED_CACHE_MS = 6 * 60 * 60 * 1000
@@ -96,6 +114,7 @@ const recordSystemIncident = createSystemIncidentRecorder({ supabase: supabaseAd
 const systemHealthService = createSystemHealthService({
   supabase: supabaseAdmin,
   geminiApiKey,
+  geminiModel: 'gemini-3.8-flash',
   rateLimiter,
   emailDeliveryStatus: getEmailDeliveryStatus(),
   recordIncident: recordSystemIncident,
@@ -119,7 +138,7 @@ function getRouteCategory(pathname) {
 
 function loadEnvFile(projectDir) {
   const raw = {}
-  for (const file of ['.env.local', '.env']) {
+  for (const file of ['.env', '.env.local']) {
     const envPath = path.join(projectDir, file)
     if (!fs.existsSync(envPath)) continue
 
@@ -134,7 +153,7 @@ function loadEnvFile(projectDir) {
     }
   }
 
-  return { ...process.env, ...raw }
+  return { ...raw, ...process.env }
 }
 
 function getJsonBody(req) {
@@ -1143,6 +1162,15 @@ function attachAiRequestTelemetry(req, res, featureType) {
   const startedAt = process.hrtime.bigint()
   res.once('finish', () => {
     const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6
+    if (res.statusCode >= 500) {
+      console.error('[ai] AI request returned a server error.', {
+        requestId: req.skillbridgeRequestId,
+        featureType,
+        statusCode: res.statusCode,
+        providerStatus: req.aiMonitoring.providerStatus,
+        errorCategory: req.aiMonitoring.errorCategory,
+      })
+    }
     const event = buildAiRequestEvent({
       featureType,
       statusCode: res.statusCode,
@@ -1550,13 +1578,16 @@ ${JSON.stringify(safeDocumentText)}
   let analysisModel = 'deterministic-fallback'
   if (!geminiApiKey) setAiFallbackMetadata(req)
   if (geminiApiKey) {
-    for (const model of ['gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite']) {
+    for (const model of ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite']) {
       const generated = await requestGeminiJson({
         prompt: analysisPrompt,
         validate: normalizeCvAnalysis,
-        send: (prompt) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiApiKey)}`, {
+        send: (prompt) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': geminiApiKey,
+          },
           body: JSON.stringify({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             generationConfig: {
@@ -1565,7 +1596,7 @@ ${JSON.stringify(safeDocumentText)}
               responseMimeType: 'application/json',
             },
           }),
-          signal: AbortSignal.timeout(45000),
+          signal: AbortSignal.timeout(20000),
         }),
       })
       updateAiProviderMetadata(req, generated, model)
@@ -1576,10 +1607,12 @@ ${JSON.stringify(safeDocumentText)}
       }
 
       console.warn('[ai] CV analysis response was not usable.', {
+        requestId: req?.skillbridgeRequestId,
         model,
         responseId: generated.responseId,
         httpStatus: generated.httpStatus,
         reason: generated.reason,
+        providerErrorCode: generated.providerErrorCode,
       })
       if (generated.httpStatus !== 404 && generated.httpStatus !== 503) break
     }
@@ -1757,10 +1790,12 @@ Use an empty actions array when no SkillBridge action is relevant, and an empty 
         }
       }
       console.warn('[ai] Career chat web-search response was not usable.', {
+        requestId: req?.skillbridgeRequestId,
         model: generated.model || 'gemini-3.8-flash',
         responseId: generated.responseId,
         httpStatus: generated.httpStatus,
         reason: generated.reason,
+        providerErrorCode: generated.providerErrorCode,
       })
     } else {
       console.warn('[ai] Career chat web search provider is not configured.')
@@ -1776,15 +1811,18 @@ Use an empty actions array when no SkillBridge action is relevant, and an empty 
     return buildCareerAssistantFallback(question, summary)
   }
 
-  const modelCandidates = ['gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite']
+  const modelCandidates = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite']
 
   for (const model of modelCandidates) {
     const generated = await requestGeminiJson({
       prompt,
       validate: normalizeChatResponse,
-      send: (input) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiApiKey)}`, {
+      send: (input) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': geminiApiKey,
+        },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: input }] }],
           generationConfig: {
@@ -1793,6 +1831,7 @@ Use an empty actions array when no SkillBridge action is relevant, and an empty 
             responseMimeType: 'application/json',
           },
         }),
+        signal: AbortSignal.timeout(20000),
       }),
     })
     updateAiProviderMetadata(req, generated, model)
@@ -1806,10 +1845,12 @@ Use an empty actions array when no SkillBridge action is relevant, and an empty 
     }
 
     console.warn('[ai] Career chat response was not usable.', {
+      requestId: req?.skillbridgeRequestId,
       model,
       responseId: generated.responseId,
       httpStatus: generated.httpStatus,
       reason: generated.reason,
+      providerErrorCode: generated.providerErrorCode,
     })
     if (generated.httpStatus !== 404 && generated.httpStatus !== 503) break
   }
@@ -1874,7 +1915,13 @@ async function handleCareerChat(req, res) {
     try {
       history = await getRecentMessages(actualConversationId)
     } catch (error) {
-      console.warn('[ai] Unable to load recent career chat context.', { errorName: error?.name || 'Error' })
+      console.warn('[ai] Unable to load recent career chat context.', {
+        requestId: req?.skillbridgeRequestId,
+        errorName: error?.name || 'Error',
+        errorCode: typeof error?.code === 'string' && /^[A-Z0-9_-]{2,40}$/i.test(error.code)
+          ? error.code
+          : undefined,
+      })
     }
 
     const result = await generateGeminiReply(question, summary, history, req)
@@ -1895,7 +1942,13 @@ async function handleCareerChat(req, res) {
         }
         conversations = await listConversations(actualStudentId)
       } catch (error) {
-        console.error('[ai] Unable to save career chat history.', { errorName: error?.name || 'Error' })
+        console.error('[ai] Unable to save career chat history.', {
+          requestId: req?.skillbridgeRequestId,
+          errorName: error?.name || 'Error',
+          errorCode: typeof error?.code === 'string' && /^[A-Z0-9_-]{2,40}$/i.test(error.code)
+            ? error.code
+            : undefined,
+        })
         conversations = []
       }
     }
@@ -1913,27 +1966,34 @@ async function handleCareerChat(req, res) {
       },
     })
   } catch (error) {
-    console.error('[ai] Unable to process career chat.', { errorName: error?.name || 'Error' })
+    console.error('[ai] Unable to process career chat.', {
+      requestId: req?.skillbridgeRequestId,
+      errorName: error?.name || 'Error',
+      errorCode: typeof error?.code === 'string' && /^[A-Z0-9_-]{2,40}$/i.test(error.code)
+        ? error.code
+        : undefined,
+    })
     sendJson(res, 500, errorResponse('Unable to process your request right now.', 500))
   }
 }
 
 async function handleChatHistory(req, res, url) {
-  const studentId = url.searchParams.get('studentId')
-  if (!studentId) {
-    sendJson(res, 400, errorResponse('A student ID is required.', 400))
-    return
-  }
-  const user = await getAuthenticatedUser(req)
-  if (!user) {
-    sendJson(res, 401, errorResponse('Please sign in again to access chat history.', 401))
-    return
-  }
-  if (studentId !== user.id) {
-    sendJson(res, 403, errorResponse('You can only access your own chat history.', 403))
-    return
-  }
   try {
+    const studentId = url.searchParams.get('studentId')
+    if (!studentId) {
+      sendJson(res, 400, errorResponse('A student ID is required.', 400))
+      return
+    }
+    const user = await getAuthenticatedUser(req)
+    if (!user) {
+      sendJson(res, 401, errorResponse('Please sign in again to access chat history.', 401))
+      return
+    }
+    if (studentId !== user.id) {
+      sendJson(res, 403, errorResponse('You can only access your own chat history.', 403))
+      return
+    }
+
     const profile = await getStudentProfile(user.id)
     if (!profile || !['student', 'graduate'].includes(profile.role)) {
       sendJson(res, 403, errorResponse('Chat history is available to student and graduate accounts.', 403))
@@ -1967,14 +2027,30 @@ async function handleChatHistory(req, res, url) {
     }
     sendJson(res, 200, { ok: true, data: result })
   } catch (error) {
-    console.error('[ai] Unable to load career chat history.', { errorName: error?.name || 'Error' })
+    console.error('[ai] Unable to load career chat history.', {
+      requestId: req?.skillbridgeRequestId,
+      errorName: error?.name || 'Error',
+      errorCode: typeof error?.code === 'string' && /^[A-Z0-9_-]{2,40}$/i.test(error.code)
+        ? error.code
+        : undefined,
+    })
     sendJson(res, 503, errorResponse('Unable to load chat history right now.', 503))
   }
 }
 
-const server = http.createServer(async (req, res) => {
+export async function handleApiRequest(req, res) {
+  const providedRequestId = req.headers?.['x-skillbridge-request-id']
+  req.skillbridgeRequestId = typeof providedRequestId === 'string' && /^[A-Z0-9-]{8,64}$/i.test(providedRequestId)
+    ? providedRequestId
+    : `SB-${randomUUID().toUpperCase()}`
+  res.setHeader('X-SkillBridge-Request-Id', req.skillbridgeRequestId)
+
   const corsResult = applyCorsPolicy(req, res, corsPolicy)
   if (!corsResult.allowed) {
+    console.warn('[api] Request rejected by CORS.', {
+      requestId: req.skillbridgeRequestId,
+      statusCode: corsResult.statusCode,
+    })
     sendJson(res, corsResult.statusCode, errorResponse(corsResult.message, corsResult.statusCode))
     return
   }
@@ -2002,6 +2078,7 @@ const server = http.createServer(async (req, res) => {
     if (!await enforceRateLimit(req, res, url.pathname)) return
   } catch (error) {
     console.error('[rate-limit] storage request failed.', {
+      requestId: req.skillbridgeRequestId,
       errorCode: error?.code || error?.name || 'storage_error',
     })
     sendJson(res, 503, errorResponse('Request protection is temporarily unavailable. Please try again later.', 503))
@@ -2077,7 +2154,13 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method !== 'POST') {
-    sendJson(res, 405, errorResponse('Only GET and POST requests are supported.', 405))
+    const hasPostRoute = monitoredAiRoutes.has(`POST ${url.pathname}`)
+      || ['/api/ai/career-chat', '/api/ai/career-recommendations', '/api/admin/skills/extract-pdf'].includes(url.pathname)
+    const statusCode = hasPostRoute ? 405 : 404
+    sendJson(res, statusCode, errorResponse(
+      hasPostRoute ? 'Only GET and POST requests are supported.' : 'Route not found.',
+      statusCode,
+    ))
     return
   }
 
@@ -2093,8 +2176,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   sendJson(res, 404, errorResponse('Route not found.', 404))
-})
+}
 
-server.listen(port, () => {
-  console.log(`SkillBridge AI API running on http://localhost:${port}`)
-})
+if (process.env.VERCEL !== '1' && process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  http.createServer(handleApiRequest).listen(port, () => {
+    console.log(`SkillBridge AI API running on http://localhost:${port}`)
+  })
+}

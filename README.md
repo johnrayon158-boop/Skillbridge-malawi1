@@ -23,3 +23,16 @@ The Render blueprint configures the API CORS allowlist for the GitHub Pages orig
 
 Run `npm run dev -- --host 0.0.0.0` to start the frontend and API together. The Vite development server proxies `/api` requests to the local API, so the app also works when opened from another device on the same network without adding that device's address to the API CORS allowlist.
 
+## Deploy frontend and API to Vercel
+
+The Vercel deployment uses the Vite static build plus the Node.js catch-all function in `api/[...path].js`; it does not start the standalone server process. The Career Assistant uses same-origin `/api` routes when `VITE_API_BASE_URL` is unset.
+
+Set these Vercel environment variables for the required environments, then redeploy:
+
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` for the browser client. Never use a service-role key for either variable.
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `GEMINI_API_KEY` for the server function. Keep these server-only and do not prefix them with `VITE_`.
+- `RATE_LIMIT_HASH_SECRET` as a random secret.
+- `CORS_ALLOWED_ORIGINS` for any custom domains or external frontend origins. Vercel preview and production project domains are added from Vercel's runtime environment.
+
+Leave `VITE_API_BASE_URL` unset to use the Vercel API function. If the frontend uses a separately deployed Render API instead, set `VITE_API_BASE_URL` to that API's public HTTPS URL and add the exact Vercel frontend origin(s) to the Render API's `CORS_ALLOWED_ORIGINS`. The Vercel API health check is available at `/api/health`.
+

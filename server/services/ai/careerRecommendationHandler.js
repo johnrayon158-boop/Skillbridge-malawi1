@@ -10,13 +10,13 @@ export function createCareerRecommendationHandler({
   scoreRecommendations = calculateCareerRecommendations,
 }) {
   return async function handleCareerRecommendations(req, res) {
-    const user = await authenticate(req)
-    if (!user) {
-      sendJson(res, 401, errorResponse('Please sign in again to load career recommendations.', 401))
-      return
-    }
-
     try {
+      const user = await authenticate(req)
+      if (!user) {
+        sendJson(res, 401, errorResponse('Please sign in again to load career recommendations.', 401))
+        return
+      }
+
       const data = await loadData(user.id)
       if (!data?.profile) {
         sendJson(res, 404, errorResponse('Your student profile was not found.', 404))
@@ -50,7 +50,11 @@ export function createCareerRecommendationHandler({
       sendJson(res, 200, { ok: true, data: recommendations })
     } catch (error) {
       console.error('[ai] Unable to generate career recommendations.', {
+        requestId: req?.skillbridgeRequestId,
         errorName: error?.name || 'Error',
+        errorCode: typeof error?.code === 'string' && /^[A-Z0-9_-]{2,40}$/i.test(error.code)
+          ? error.code
+          : undefined,
       })
       sendJson(res, 503, errorResponse('Unable to load or save career recommendations right now.', 503))
     }

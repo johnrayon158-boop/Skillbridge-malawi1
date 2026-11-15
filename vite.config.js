@@ -23,6 +23,9 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    proxy: {},
+  },
   build: {
     rolldownOptions: {
       output: {

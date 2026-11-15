@@ -13,7 +13,7 @@ import {
   normalizeSkillGaps,
   parseGeminiJson,
 } from '../server/services/ai/responseSchemas.js'
-import { requestGeminiJson } from '../server/services/ai/geminiJson.js'
+import { classifyGeminiProviderError, requestGeminiJson } from '../server/services/ai/geminiJson.js'
 import { createAiRouteHandlers } from '../server/services/ai/aiRouteHandlers.js'
 import {
   calculateSkillGaps,
@@ -91,13 +91,54 @@ test('returns a safe invalid/unavailable status without exposing provider bodies
     validate: () => null,
     send: async () => {
       calls += 1
-      return jsonResponse({ error: { message: 'private provider detail' } }, 503)
+      return jsonResponse({ error: { status: 'UNAVAILABLE', message: 'private provider detail' } }, 503)
     },
   })
   assert.equal(calls, 1)
   assert.equal(unavailable.status, 'unavailable')
-  assert.equal(unavailable.reason, 'provider_error')
+  assert.equal(unavailable.reason, 'provider_unavailable')
+  assert.equal(unavailable.providerErrorCode, 'UNAVAILABLE')
   assert.equal(Object.hasOwn(unavailable, 'error'), false)
+  assert.doesNotMatch(JSON.stringify(unavailable), /private provider detail/)
+})
+
+test('classifies Gemini authentication, permission, quota, and transient errors without exposing messages', async () => {
+  const cases = [
+    [401, 'UNAUTHENTICATED', 'provider_authentication'],
+    [403, 'PERMISSION_DENIED', 'provider_permission'],
+    [429, 'RESOURCE_EXHAUSTED', 'provider_quota'],
+    [429, 'RATE_LIMIT_EXCEEDED', 'provider_rate_limit'],
+    [404, 'MODEL_NOT_FOUND', 'model_not_found'],
+    [503, 'UNAVAILABLE', 'provider_unavailable'],
+  ]
+
+  for (const [status, code, reason] of cases) {
+    assert.equal(classifyGeminiProviderError(status, code), reason)
+    const result = await requestGeminiJson({
+      prompt: 'Return JSON.',
+      validate: () => null,
+      send: async () => jsonResponse({ error: { status: code, message: 'sensitive detail' } }, status),
+    })
+    assert.equal(result.reason, reason)
+    assert.equal(result.providerErrorCode, code)
+    assert.doesNotMatch(JSON.stringify(result), /sensitive detail/)
+  }
+})
+
+test('classifies network timeouts separately from other transport failures', async () => {
+  const timeout = await requestGeminiJson({
+    prompt: 'Return JSON.',
+    validate: () => null,
+    send: async () => { throw Object.assign(new Error('private request details'), { name: 'TimeoutError' }) },
+  })
+  const network = await requestGeminiJson({
+    prompt: 'Return JSON.',
+    validate: () => null,
+    send: async () => { throw Object.assign(new Error('private request details'), { code: 'ECONNRESET' }) },
+  })
+  assert.equal(timeout.reason, 'timeout')
+  assert.equal(network.reason, 'network_error')
+  assert.doesNotMatch(JSON.stringify(timeout), /private request details/)
 })
 
 test('normalizes deterministic AI feature schemas and rejects malformed results', () => {

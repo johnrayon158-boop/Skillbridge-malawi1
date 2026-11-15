@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { createDebugReference } from '../utils/requestError'
 
 const configuredApiBase = import.meta.env.VITE_AI_API_URL || import.meta.env.VITE_API_BASE_URL
 const isLoopbackApi = (() => {
@@ -22,23 +23,27 @@ const isRecord = (value) => value !== null && typeof value === 'object' && !Arra
 const safeDate = (value) => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null
 
 async function readAiResponse(response, fallbackMessage) {
+  const requestId = response.headers.get('x-skillbridge-request-id') || undefined
+  const createRequestError = (message) => Object.assign(new Error(message), requestId ? { requestId } : {})
   let payload
   try {
     payload = await response.json()
   } catch {
-    throw new Error('The SkillBridge AI service returned an invalid response. Please try again later.')
+    throw createRequestError('The SkillBridge AI service returned an invalid response. Please try again later.')
   }
   if (!isRecord(payload)) {
-    throw new Error('The SkillBridge AI service returned an invalid response. Please try again later.')
+    throw createRequestError('The SkillBridge AI service returned an invalid response. Please try again later.')
   }
   if (!response.ok || payload.ok !== true) {
-    const requestError = new Error(fallbackMessage)
+    const requestError = createRequestError(fallbackMessage)
     requestError.status = response.status
-    if (response.status === 429 || response.status >= 500) requestError.code = 'AI_UNAVAILABLE'
+    requestError.code = typeof payload.code === 'string'
+      ? payload.code
+      : response.status === 429 || response.status >= 500 ? 'AI_UNAVAILABLE' : ''
     throw requestError
   }
   if (!Object.hasOwn(payload, 'data')) {
-    throw new Error('The SkillBridge AI service returned an incomplete response. Please try again later.')
+    throw createRequestError('The SkillBridge AI service returned an incomplete response. Please try again later.')
   }
   return payload.data
 }
@@ -77,15 +82,26 @@ async function getAccessToken() {
 }
 
 async function fetchAiApi(url, options) {
+  const requestId = createDebugReference()
   try {
-    return await fetch(url, options)
+    return await fetch(url, {
+      ...options,
+      headers: {
+        ...options?.headers,
+        'X-SkillBridge-Request-Id': requestId,
+      },
+    })
   } catch (error) {
     if (error instanceof TypeError) {
       const guidance = import.meta.env.DEV
         ? 'Start the API with "npm run dev" so it runs alongside Vite.'
-        : 'Set VITE_AI_API_URL to the public HTTPS URL of your deployed API and redeploy the frontend.'
-      throw new Error(`Cannot reach the SkillBridge API at ${AI_API_BASE}. ${guidance}`, { cause: error })
+        : 'Set VITE_API_BASE_URL to the public HTTPS URL of your deployed API and redeploy the frontend.'
+      throw Object.assign(
+        new Error(`Cannot reach the SkillBridge API at ${AI_API_BASE}. ${guidance}`, { cause: error }),
+        { requestId },
+      )
     }
+    if (error && typeof error === 'object') error.requestId = requestId
     throw error
   }
 }

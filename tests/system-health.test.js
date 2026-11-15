@@ -82,6 +82,25 @@ test('health checks only report operational after each provider probe succeeds',
   assert.equal(result.incidents.available, true)
 })
 
+test('Gemini health probe checks the Career Assistant model without putting its key in the URL', async () => {
+  let request
+  await makeHealthService({
+    fetchImpl: async (url, options) => {
+      request = { url, options }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ supportedGenerationMethods: ['generateContent'] }),
+      }
+    },
+  }).runChecks()
+
+  assert.match(request.url, /models\/gemini-3\.8-flash$/)
+  assert.equal(new URL(request.url).search, '')
+  assert.equal(request.options.headers['x-goog-api-key'], 'test-key-not-a-real-secret')
+  assert.ok(request.options.signal)
+})
+
 test('failed database, auth, storage, Gemini, and rate-limit probes are not reported as operational', async () => {
   const recorded = []
   const result = await makeHealthService({
