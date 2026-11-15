@@ -25,7 +25,7 @@ Run `npm run dev -- --host 0.0.0.0` to start the frontend and API together. The 
 
 ## Deploy frontend and API to Vercel
 
-The Vercel deployment uses the Vite static build plus the Node.js catch-all function in `api/[...path].js`; it does not start the standalone server process. The Career Assistant uses same-origin `/api` routes when `VITE_API_BASE_URL` is unset.
+The Vercel deployment uses the Vite static build plus the shared Node.js function in `api/index.js`; `vercel.json` rewrites nested `/api/*` routes to this function while preserving their original paths. It does not start the standalone server process. The Career Assistant uses same-origin `/api` routes when `VITE_API_BASE_URL` is unset.
 
 Set these Vercel environment variables for the required environments, then redeploy:
 

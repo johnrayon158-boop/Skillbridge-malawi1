@@ -5,12 +5,16 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "/api?__skillbridge_path=:path*"
+    },
+    {
       "source": "/:path((?!api/).*)",
       "destination": "/index.html"
     }
   ],
   "functions": {
-    "api/[...path].js": {
+    "api/index.js": {
       "maxDuration": 60
     }
   }

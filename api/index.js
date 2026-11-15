@@ -4,7 +4,18 @@ export const config = {
   api: { bodyParser: false },
 }
 
+function restoreRewrittenApiPath(req) {
+  const requestUrl = new URL(req.url || '/api', `http://${req.headers.host || 'localhost'}`)
+  const apiPath = requestUrl.searchParams.get('__skillbridge_path')
+  if (apiPath !== null) {
+    requestUrl.pathname = `/api/${apiPath.replace(/^\/+/, '')}`
+    requestUrl.searchParams.delete('__skillbridge_path')
+    req.url = `${requestUrl.pathname}${requestUrl.search}`
+  }
+}
+
 export default async function handleVercelRequest(req, res) {
+  restoreRewrittenApiPath(req)
   if (req.url === '/api/health' || req.url.startsWith('/api/health?')) {
     req.url = req.url.replace(/^\/api\/health/, '/health')
   }

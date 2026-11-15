@@ -8,9 +8,9 @@ process.env.VERCEL = '1'
 process.env.NODE_ENV = 'test'
 process.env.VERCEL_URL = 'skillbridge-test.vercel.app'
 
-const { default: handleVercelRequest } = await import('../api/[...path].js')
+const { default: handleVercelRequest } = await import('../api/index.js')
 
-test('Vercel catch-all serves health and routes protected Career Assistant endpoints', async (context) => {
+test('Vercel shared API function routes nested Career Assistant endpoints', async (context) => {
   const server = http.createServer((req, res) => {
     void handleVercelRequest(req, res)
   })
@@ -21,7 +21,7 @@ test('Vercel catch-all serves health and routes protected Career Assistant endpo
   }))
 
   const baseUrl = `http://127.0.0.1:${server.address().port}`
-  const health = await fetch(`${baseUrl}/api/health`, {
+  const health = await fetch(`${baseUrl}/api?__skillbridge_path=health`, {
     headers: {
       Origin: 'https://skillbridge-test.vercel.app',
       'X-SkillBridge-Request-Id': 'SB-VERCEL-TEST',
@@ -32,7 +32,7 @@ test('Vercel catch-all serves health and routes protected Career Assistant endpo
   assert.equal(health.headers.get('x-skillbridge-request-id'), 'SB-VERCEL-TEST')
   assert.equal((await health.json()).data.status, 'ok')
 
-  const chat = await fetch(`${baseUrl}/api/ai/career-chat`, {
+  const chat = await fetch(`${baseUrl}/api?__skillbridge_path=ai/career-chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: 'Hello' }),
@@ -40,16 +40,16 @@ test('Vercel catch-all serves health and routes protected Career Assistant endpo
   assert.equal(chat.status, 401)
   assert.match(chat.headers.get('x-skillbridge-request-id'), /^SB-[A-Z0-9-]+$/)
 
-  const history = await fetch(`${baseUrl}/api/ai/career-chat/conversations?studentId=student-1`)
+  const history = await fetch(`${baseUrl}/api?__skillbridge_path=ai/career-chat/conversations&studentId=student-1`)
   assert.equal(history.status, 401)
 
-  const recommendations = await fetch(`${baseUrl}/api/ai/career-recommendations`, {
+  const recommendations = await fetch(`${baseUrl}/api?__skillbridge_path=ai/career-recommendations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
   })
   assert.equal(recommendations.status, 401)
 
-  const unknown = await fetch(`${baseUrl}/api/__unknown`)
+  const unknown = await fetch(`${baseUrl}/api?__skillbridge_path=__unknown`)
   assert.equal(unknown.status, 404)
 })
