@@ -1,4 +1,4 @@
-import { ArrowRight, BrainCircuit, Eye, EyeOff, Lock, Mail } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
@@ -50,7 +50,7 @@ export default function LoginPage() {
       <div className="grid w-full max-w-6xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_20px_80px_rgba(15,23,42,0.08)] lg:grid-cols-[1.1fr_0.9fr]">
         <div className="bg-slate-900 p-8 text-white sm:p-10 lg:p-12">
           <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-sm font-medium text-sky-300">
-            <BrainCircuit size={16} />
+            <img src={`${import.meta.env.BASE_URL}skillbridge-logo.png`} alt="" className="h-5 w-5 object-contain" />
             SkillBridge Malawi
           </div>
           <h1 className="mt-8 text-4xl font-black tracking-tight">Welcome back.</h1>

@@ -19,9 +19,7 @@ export function AppSidebar() {
   return (
     <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-slate-200 bg-slate-50 lg:flex lg:flex-col">
       <div className="flex items-center gap-3 border-b border-slate-200 px-6 py-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-800 text-lg font-bold text-white">
-          S
-        </div>
+        <img src={`${import.meta.env.BASE_URL}skillbridge-logo.png`} alt="" className="h-10 w-10 shrink-0 object-contain" />
         <div>
           <p className="text-lg font-bold text-slate-900">SkillBridge</p>
           <p className="text-xs uppercase tracking-[0.18em] text-sky-700">Malawi</p>

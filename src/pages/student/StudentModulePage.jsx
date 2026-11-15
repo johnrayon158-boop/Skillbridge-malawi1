@@ -40,6 +40,7 @@ import { InterviewConductNotice } from '../../components/interviews/InterviewCon
 import { InterviewPolicyReport } from '../../components/interviews/InterviewPolicyReport'
 import { formatInterviewDateTime, getSafeMeetingUrl, normalizeInterviewReport } from '../../utils/interviewPolicy'
 import { filterSkillCatalog, SKILL_CATEGORIES } from '../../utils/skillCatalog'
+import { createAssessmentRequestId } from '../../utils/assessmentRequestId'
 import AdvancedCareerIntelligence from './AdvancedCareerIntelligence'
 import StudentSkillInsights from './StudentSkillInsights'
 import StudentMarketPage from './StudentMarketPage'
@@ -885,7 +886,7 @@ function AssessmentsView({ userId, detailId }) {
   const attemptRequestKey = `${userId}:${detailId}`
   // Regenerate the idempotency key for each assessment visit, not on unrelated renders.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const attemptRequestId = useMemo(() => globalThis.crypto.randomUUID(), [attemptRequestKey])
+  const attemptRequestId = useMemo(() => createAssessmentRequestId(), [attemptRequestKey])
   const isResultPage = location.pathname.endsWith('/results')
   const resultId = new URLSearchParams(location.search).get('result')
   const libraryLoading = libraryData.userId !== userId || libraryData.key !== retry

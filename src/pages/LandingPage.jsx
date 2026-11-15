@@ -110,7 +110,12 @@ function BrandLink({ footer = false, onClick, compact = false }) {
       aria-label="SkillBridge Malawi home"
       className={`inline-flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2 ${footer ? '' : 'shrink-0'} ${compact ? 'max-[380px]:gap-1' : ''}`}
     >
-      <span className={`flex h-10 w-10 items-center justify-center rounded-xl bg-sky-700 text-lg font-bold text-white ${compact ? 'max-[380px]:h-9 max-[380px]:w-9' : ''}`} aria-hidden="true">S</span>
+      <img
+        src={`${import.meta.env.BASE_URL}skillbridge-logo.png`}
+        alt=""
+        aria-hidden="true"
+        className={`h-10 w-10 shrink-0 object-contain ${compact ? 'max-[380px]:h-9 max-[380px]:w-9' : ''}`}
+      />
       <span className="leading-tight">
         <span className={`block text-base font-bold text-slate-900 ${compact ? 'max-[380px]:text-sm' : ''}`}>SkillBridge</span>
         <span className={`block text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-700 ${compact ? 'max-[380px]:hidden' : ''}`}>Malawi</span>
