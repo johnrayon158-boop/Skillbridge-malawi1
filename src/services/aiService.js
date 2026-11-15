@@ -9,7 +9,7 @@ const isLoopbackApi = (() => {
     return false
   }
 })()
-const useConfiguredApi = configuredApiBase && !(import.meta.env.PROD && isLoopbackApi)
+const useConfiguredApi = configuredApiBase && !isLoopbackApi
 const AI_API_BASE = (useConfiguredApi
   ? configuredApiBase
   : import.meta.env.DEV && typeof window !== 'undefined'
