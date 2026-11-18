@@ -1,17 +1,23 @@
 export const RESET_PASSWORD_PATH = '/reset-password'
 
-export function parseRecoveryRedirect(hash = '', search = '') {
+export function parseRecoveryRedirect(hash = '', search = '', pathname = '') {
   const hashParams = new URLSearchParams(String(hash || '').replace(/^#/, ''))
   const searchParams = new URLSearchParams(String(search || '').replace(/^\?/, ''))
+  const recoveryParams = [hashParams, searchParams]
 
   const errorCode = hashParams.get('error_code')
     || hashParams.get('error')
     || searchParams.get('error_code')
     || searchParams.get('error')
     || ''
+  const hasRecoveryToken = recoveryParams.some((params) =>
+    params.get('type') === 'recovery' && Boolean(params.get('access_token')),
+  )
+  const isResetRoute = String(pathname || '').replace(/\/+$/, '').endsWith(RESET_PASSWORD_PATH)
+  const hasResetCode = isResetRoute && Boolean(searchParams.get('code'))
 
   return {
-    isRecovery: hashParams.get('type') === 'recovery' && Boolean(hashParams.get('access_token')),
+    isRecovery: hasRecoveryToken || hasResetCode,
     errorCode,
   }
 }

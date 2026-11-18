@@ -12,6 +12,21 @@ test('detects a Supabase recovery link before the auth client clears the URL has
   assert.equal(result.errorCode, '')
 })
 
+test('detects recovery tokens in query parameters', () => {
+  const result = parseRecoveryRedirect(
+    '',
+    '?access_token=abc&type=recovery',
+  )
+
+  assert.equal(result.isRecovery, true)
+})
+
+test('detects a PKCE callback code on the reset-password route only', () => {
+  assert.equal(parseRecoveryRedirect('', '?code=abc', '/reset-password').isRecovery, true)
+  assert.equal(parseRecoveryRedirect('', '?code=abc', '/').isRecovery, false)
+  assert.equal(parseRecoveryRedirect('', '?code=abc', '/Skillbridge-malawi1/reset-password').isRecovery, true)
+})
+
 test('ignores ordinary navigation, signup links, and missing access tokens', () => {
   assert.equal(parseRecoveryRedirect('', '').isRecovery, false)
   assert.equal(parseRecoveryRedirect('#section-two', '').isRecovery, false)

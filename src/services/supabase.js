@@ -6,7 +6,7 @@ import { parseRecoveryRedirect } from '../utils/authRedirect'
 // to know the visitor arrived from a password reset email.
 export const initialRecoveryRedirect = typeof window === 'undefined'
   ? { isRecovery: false, errorCode: '' }
-  : parseRecoveryRedirect(window.location.hash, window.location.search)
+  : parseRecoveryRedirect(window.location.hash, window.location.search, window.location.pathname)
 
 export const supabaseConfigStatus = {
   hasUrl: Boolean(import.meta.env.VITE_SUPABASE_URL),
