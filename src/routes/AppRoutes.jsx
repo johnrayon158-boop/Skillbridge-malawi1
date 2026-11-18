@@ -43,8 +43,9 @@ export default function AppRoutes() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
             </Route>
+
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           <Route element={<ProtectedRoute />}>
             <Route path="/admin" element={<RoleRoute allowedRoles={['admin']}><Navigate to="/admin/dashboard" replace /></RoleRoute>} />
