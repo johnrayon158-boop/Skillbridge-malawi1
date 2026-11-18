@@ -1,3 +1,4 @@
+import { buildResetPasswordRedirectUrl } from '../utils/authRedirect'
 import { getFriendlyAuthError } from '../utils/authError'
 import {
   getSupabaseConfigMessage,
@@ -11,15 +12,11 @@ const ensureSupabaseConfig = () => {
   }
 }
 
-const getResetPasswordRedirectUrl = () => {
-  const configuredSiteUrl = (
-    import.meta.env.VITE_APP_SITE_URL ||
-    import.meta.env.VITE_PUBLIC_SITE_URL ||
-    window.location.origin
-  )
-
-  return `${String(configuredSiteUrl).replace(/\/$/, '')}/reset-password`
-}
+const getResetPasswordRedirectUrl = () => buildResetPasswordRedirectUrl({
+  origin: window.location.origin,
+  baseUrl: import.meta.env.BASE_URL,
+  configuredSiteUrl: import.meta.env.VITE_APP_SITE_URL || import.meta.env.VITE_PUBLIC_SITE_URL,
+})
 
 function reportSignInFailure() {
   const configuredApiUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_AI_API_URL

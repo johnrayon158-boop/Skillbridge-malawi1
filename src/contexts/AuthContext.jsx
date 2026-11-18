@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { authService } from '../services/authService'
-import { supabase } from '../services/supabase'
+import { initialRecoveryRedirect, supabase } from '../services/supabase'
 
 const AuthContext = createContext(null)
 
@@ -10,6 +10,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [passwordRecovery, setPasswordRecovery] = useState(initialRecoveryRedirect.isRecovery)
   const profileRequestId = useRef(0)
 
   const refreshProfile = useCallback(async (currentUser) => {
@@ -91,8 +92,11 @@ export function AuthProvider({ children }) {
 
     initializeAuth()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!isMounted) return
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true)
+      }
       handleSessionChange(nextSession)
       setLoading(false)
     })
@@ -144,7 +148,12 @@ export function AuthProvider({ children }) {
     setUser(null)
     setSession(null)
     setProfile(null)
+    setPasswordRecovery(false)
     return result
+  }, [])
+
+  const completePasswordRecovery = useCallback(() => {
+    setPasswordRecovery(false)
   }, [])
 
   const resetPassword = useCallback(async (email) => {
@@ -172,13 +181,16 @@ export function AuthProvider({ children }) {
     profileLoading,
     loading,
     isAuthenticated,
+    passwordRecovery,
+    recoveryLinkError: initialRecoveryRedirect.errorCode,
     login,
     register,
     logout,
     resetPassword,
     updateProfile,
     refreshProfile,
-  }), [user, session, profile, profileLoading, loading, isAuthenticated, login, register, logout, resetPassword, updateProfile, refreshProfile])
+    completePasswordRecovery,
+  }), [user, session, profile, profileLoading, loading, isAuthenticated, passwordRecovery, login, register, logout, resetPassword, updateProfile, refreshProfile, completePasswordRecovery])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

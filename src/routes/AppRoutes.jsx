@@ -1,6 +1,7 @@
-import { Suspense, lazy } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { AuthProvider } from '../contexts/AuthContext'
+import { Suspense, lazy, useEffect } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from '../contexts/AuthContext'
+import { RESET_PASSWORD_PATH } from '../utils/authRedirect'
 import ProtectedRoute from './ProtectedRoute'
 import PublicOnlyRoute from './PublicOnlyRoute'
 import RoleRoute from './RoleRoute'
@@ -29,10 +30,28 @@ const routeFallback = (
   </div>
 )
 
+function PasswordRecoveryRedirect() {
+  const { passwordRecovery } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    // Supabase falls back to the Site URL when redirect_to is not allowlisted,
+    // so a reset link can land on "/" (or any route). Send the visitor to the
+    // form instead of letting the dashboard swallow the recovery session.
+    if (passwordRecovery && location.pathname !== RESET_PASSWORD_PATH) {
+      navigate(RESET_PASSWORD_PATH, { replace: true })
+    }
+  }, [passwordRecovery, location.pathname, navigate])
+
+  return null
+}
+
 export default function AppRoutes() {
   return (
     <AuthProvider>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <PasswordRecoveryRedirect />
         <Suspense fallback={routeFallback}>
           <Routes>
             <Route element={<PublicOnlyRoute />}>

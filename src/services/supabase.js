@@ -1,4 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
+import { parseRecoveryRedirect } from '../utils/authRedirect'
+
+// Captured before createClient() initializes: the auth client consumes the
+// recovery tokens and clears the URL hash, so this is the only reliable point
+// to know the visitor arrived from a password reset email.
+export const initialRecoveryRedirect = typeof window === 'undefined'
+  ? { isRecovery: false, errorCode: '' }
+  : parseRecoveryRedirect(window.location.hash, window.location.search)
 
 export const supabaseConfigStatus = {
   hasUrl: Boolean(import.meta.env.VITE_SUPABASE_URL),

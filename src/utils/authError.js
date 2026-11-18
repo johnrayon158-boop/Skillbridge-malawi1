@@ -34,6 +34,10 @@ export function getFriendlyAuthError(error) {
     return 'Supabase environment variables are missing. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.'
   }
 
+  if (normalized.includes('auth session missing') || normalized.includes('session missing') || normalized.includes('session_not_found')) {
+    return 'Your reset link has expired. Request a new password reset link and try again.'
+  }
+
   if (normalized.includes('reset password') || normalized.includes('password reset')) {
     return 'Password reset instructions could not be sent. Please try again.'
   }

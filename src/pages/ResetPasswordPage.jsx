@@ -2,15 +2,25 @@ import { ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
+import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import { getFriendlyAuthError } from '../utils/authError'
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate()
+  const {
+    user,
+    loading: authLoading,
+    passwordRecovery,
+    recoveryLinkError,
+    completePasswordRecovery,
+  } = useAuth()
   const [form, setForm] = useState({ password: '', confirmPassword: '' })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const canReset = passwordRecovery || Boolean(user)
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -43,6 +53,7 @@ export default function ResetPasswordPage() {
 
       setSuccess('Your password has been updated successfully.')
       setForm({ password: '', confirmPassword: '' })
+      completePasswordRecovery()
 
       setTimeout(() => navigate('/login'), 1500)
     } catch (resetError) {
@@ -50,6 +61,40 @@ export default function ResetPasswordPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-12">
+        <p className="text-sm font-medium text-slate-600">Checking your reset link...</p>
+      </div>
+    )
+  }
+
+  if (!canReset) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-12">
+        <div className="w-full max-w-md rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_20px_80px_rgba(15,23,42,0.08)] sm:p-10">
+          <Link to="/login" className="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
+            <ArrowLeft size={16} /> Back to sign in
+          </Link>
+
+          <p className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-sky-700">Reset password</p>
+          <h1 className="mt-3 text-3xl font-bold text-slate-900">This link can’t be used</h1>
+          <p className="mt-3 text-slate-600">
+            {recoveryLinkError
+              ? 'Your password reset link has expired or was already used.'
+              : 'Open the reset link from your email to choose a new password.'}
+          </p>
+
+          <Link to="/forgot-password" className="mt-8 block">
+            <Button type="button" variant="primary" size="lg" className="w-full">
+              Request a new reset link
+            </Button>
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
