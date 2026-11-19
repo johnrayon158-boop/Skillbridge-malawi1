@@ -1,6 +1,7 @@
-import { ArrowRight, BookOpen, BriefcaseBusiness, CheckCircle2, ClipboardCheck, Compass, FileCheck2, FolderOpen, GraduationCap, Layers3, Lightbulb, MapPin, Menu, ShieldCheck, Sparkles, Target, Users, X } from 'lucide-react'
+import { ArrowRight, BookOpen, BriefcaseBusiness, CheckCircle2, ClipboardCheck, Compass, FileCheck2, FolderOpen, GraduationCap, Layers3, Lightbulb, MapPin, Menu, Moon, ShieldCheck, Sparkles, Sun, Target, Users, X } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useColorMode } from '../hooks/useColorMode'
 
 const steps = [
   {
@@ -136,6 +137,7 @@ function SectionHeading({ eyebrow, title, description, centered = false, id }) {
 
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const { theme, toggleTheme } = useColorMode()
   const closeMenu = () => setMenuOpen(false)
 
   return (
@@ -151,6 +153,15 @@ export default function LandingPage() {
           </nav>
 
           <div className="flex shrink-0 items-center gap-3 max-[380px]:gap-2">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              title={theme === 'light' ? 'Dark mode' : 'Light mode'}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 max-[380px]:h-9 max-[380px]:w-9"
+            >
+              {theme === 'light' ? <Moon size={18} aria-hidden="true" /> : <Sun size={18} aria-hidden="true" />}
+            </button>
             <Link to="/login" className="hidden rounded text-sm font-semibold text-slate-700 hover:text-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 sm:inline">Sign In</Link>
             <Link to="/register" className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-lg bg-sky-700 px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2 max-[380px]:min-h-9 max-[380px]:px-2 max-[380px]:text-xs sm:px-4">
               Create Profile

@@ -212,3 +212,17 @@ html[data-theme='dark'] .hover\:bg-slate-50:hover,
 html[data-theme='dark'] .hover\:bg-slate-100:hover {
   background-color: #334155 !important;
 }
+
+html[data-theme='dark'] [class~='bg-sky-50/70'],
+html[data-theme='dark'] [class~='bg-gradient-to-br'] {
+  background-image: none !important;
+  background-color: #0f172a !important;
+}
+
+html[data-theme='dark'] [class~='from-sky-50'],
+html[data-theme='dark'] [class~='via-white'],
+html[data-theme='dark'] [class~='to-white'] {
+  --tw-gradient-from: #0f172a var(--tw-gradient-from-position);
+  --tw-gradient-via: #0f172a var(--tw-gradient-via-position);
+  --tw-gradient-to: #0f172a var(--tw-gradient-to-position);
+}
