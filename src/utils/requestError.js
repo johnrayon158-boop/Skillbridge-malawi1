@@ -38,7 +38,15 @@ export function classifyRequestError(error, { fallback = 'We could not load this
     }
   }
 
-  if (kind === 'ai' || /ai service|ai_unavailable|gemini|model unavailable|temporarily unavailable|unable to get an answer/.test(details)) {
+  if (code === 'API_NON_JSON_RESPONSE') {
+    return {
+      category: 'service',
+      title: 'Deployment response problem',
+      message: 'Vercel returned a web page instead of an API reply. Check the deployed API route or function status.',
+    }
+  }
+
+  if (kind === 'ai' || /ai service|ai_unavailable|ai_invalid_response|gemini|model unavailable|temporarily unavailable|unable to get an answer/.test(details)) {
     return {
       category: 'ai',
       title: 'AI service temporarily unavailable',

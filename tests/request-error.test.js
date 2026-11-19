@@ -41,3 +41,17 @@ test('uses a safe fallback for server failures and marks AI outages by status', 
   assert.doesNotMatch(serverError.message, /connection string|query details/)
   assert.equal(aiError.category, 'ai')
 })
+
+test('identifies non-JSON deployment responses and preserves their HTTP status', () => {
+  const error = Object.assign(new Error('The API returned a page.'), {
+    code: 'API_NON_JSON_RESPONSE',
+    status: 503,
+  })
+  const presentation = classifyRequestError(error)
+  const metadata = getSafeErrorMetadata(error, presentation.category, 'SB-TEST-REFERENCE')
+
+  assert.equal(presentation.title, 'Deployment response problem')
+  assert.match(presentation.message, /Vercel returned a web page/)
+  assert.equal(metadata.status, 503)
+  assert.equal(metadata.code, 'API_NON_JSON_RESPONSE')
+})

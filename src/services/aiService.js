@@ -15,26 +15,41 @@ const safeDate = (value) => typeof value === 'string' && Number.isFinite(Date.pa
 
 async function readAiResponse(response, fallbackMessage) {
   const requestId = response.headers.get('x-skillbridge-request-id') || undefined
-  const createRequestError = (message) => Object.assign(new Error(message), requestId ? { requestId } : {})
+  const contentType = response.headers.get('content-type') || ''
+  const isJsonResponse = /application\/(?:[\w.-]+\+)?json\b/i.test(contentType)
+  const createRequestError = (message, code) => Object.assign(
+    new Error(message),
+    {
+      ...(requestId ? { requestId } : {}),
+      code,
+      status: response.status,
+    },
+  )
+
+  if (response.redirected || !isJsonResponse) {
+    throw createRequestError(
+      'The deployed AI API returned a page instead of a JSON response.',
+      'API_NON_JSON_RESPONSE',
+    )
+  }
+
   let payload
   try {
     payload = await response.json()
   } catch {
-    throw createRequestError('The SkillBridge AI service returned an invalid response. Please try again later.')
+    throw createRequestError('The SkillBridge AI service returned an invalid response. Please try again later.', 'AI_INVALID_RESPONSE')
   }
   if (!isRecord(payload)) {
-    throw createRequestError('The SkillBridge AI service returned an invalid response. Please try again later.')
+    throw createRequestError('The SkillBridge AI service returned an invalid response. Please try again later.', 'AI_INVALID_RESPONSE')
   }
   if (!response.ok || payload.ok !== true) {
-    const requestError = createRequestError(fallbackMessage)
-    requestError.status = response.status
-    requestError.code = typeof payload.code === 'string'
+    const code = typeof payload.code === 'string'
       ? payload.code
       : response.status === 429 || response.status >= 500 ? 'AI_UNAVAILABLE' : ''
-    throw requestError
+    throw createRequestError(fallbackMessage, code)
   }
   if (!Object.hasOwn(payload, 'data')) {
-    throw createRequestError('The SkillBridge AI service returned an incomplete response. Please try again later.')
+    throw createRequestError('The SkillBridge AI service returned an incomplete response. Please try again later.', 'AI_INVALID_RESPONSE')
   }
   return payload.data
 }

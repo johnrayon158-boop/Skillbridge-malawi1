@@ -24,6 +24,7 @@ export function RequestError({
       <p className="font-semibold">{presentation.title}</p>
       <p className="mt-1">{presentation.message}</p>
       {stale ? <p className="mt-1">The last successfully loaded information is still shown.</p> : null}
+      {Number.isInteger(error?.status) ? <p className="mt-1 text-xs">HTTP status: {error.status}</p> : null}
       <p className="mt-2 text-xs text-rose-700">Debug reference: {referenceId}</p>
       {onRetry ? <Button type="button" variant="outline" size="sm" className="mt-3" onClick={onRetry}>{retryLabel}</Button> : null}
     </div>
