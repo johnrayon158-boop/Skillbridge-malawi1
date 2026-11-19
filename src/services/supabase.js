@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { parseRecoveryRedirect } from '../utils/authRedirect'
+import { createRememberMeStorage } from '../utils/authStorage'
 
 // Captured before createClient() initializes: the auth client consumes the
 // recovery tokens and clears the URL hash, so this is the only reliable point
@@ -25,9 +26,20 @@ export const getSupabaseConfigMessage = () =>
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://example.supabase.co'
 const configuredKey = supabaseKey || 'demo-anon-key'
+const browserStorage = (storageName) => ({
+  getItem: (key) => window[storageName].getItem(key),
+  setItem: (key, value) => window[storageName].setItem(key, value),
+  removeItem: (key) => window[storageName].removeItem(key),
+})
+export const supabaseAuthStorage = createRememberMeStorage(
+  typeof window === 'undefined'
+    ? undefined
+    : { localStorage: browserStorage('localStorage'), sessionStorage: browserStorage('sessionStorage') },
+)
 
 export const supabase = createClient(supabaseUrl, configuredKey, {
   auth: {
+    storage: supabaseAuthStorage,
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,

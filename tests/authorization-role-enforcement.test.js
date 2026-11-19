@@ -18,6 +18,10 @@ const interviewWorkflow = await readFile(
   new URL('../supabase/migrations/20261117000001_interview_policy_and_consent.sql', import.meta.url),
   'utf8',
 )
+const applicationAccessMigration = await readFile(
+  new URL('../supabase/migrations/20261122000004_application_rls_recursion_fix.sql', import.meta.url),
+  'utf8',
+)
 const localUrl = process.env.SUPABASE_AUTHZ_TEST_URL
 const serviceKey = process.env.SUPABASE_AUTHZ_TEST_SERVICE_ROLE_KEY
 const anonKey = process.env.SUPABASE_AUTHZ_TEST_ANON_KEY
@@ -50,6 +54,27 @@ test('employer candidate access and privileged workflows require an employer rol
   assert.match(applicationWorkflow, /employer_update_application[\s\S]*public\.owns_employer\(target_employer_id\)/)
   assert.match(applicationWorkflow, /employer_create_offer[\s\S]*public\.owns_employer\(target_employer_id\)/)
   assert.match(interviewWorkflow, /employer_schedule_interview[\s\S]*public\.owns_employer\(target_employer_id\)/)
+})
+
+test('application policies use role-aware helpers instead of profile-policy recursion', () => {
+  const studentApplicationPolicies = applicationAccessMigration.slice(
+    applicationAccessMigration.indexOf('create policy applications_student_select'),
+    applicationAccessMigration.indexOf('create or replace function public.validate_application_candidate_eligibility'),
+  )
+
+  assert.match(applicationAccessMigration, /function public\.current_user_is_student\(\)[\s\S]*security definer[\s\S]*from public\.profiles/)
+  assert.match(applicationAccessMigration, /create policy applications_student_select[\s\S]*public\.owns_student\(student_id\)[\s\S]*public\.current_user_is_student\(\)/)
+  assert.match(applicationAccessMigration, /create policy applications_student_insert[\s\S]*public\.owns_student\(student_id\)[\s\S]*public\.current_user_is_student\(\)/)
+  assert.match(applicationAccessMigration, /create policy applications_employer_read[\s\S]*public\.owns_employer\(j\.employer_id\)/)
+  assert.doesNotMatch(studentApplicationPolicies, /from public\.profiles/i)
+  assert.match(applicationAccessMigration, /create or replace function public\.can_access_application[\s\S]*a\.student_id = \(select auth\.uid\(\)\) and public\.current_user_is_student\(\)/)
+  assert.match(applicationAccessMigration, /validate_application_candidate_eligibility[\s\S]*new\.student_id[\s\S]*p\.role = 'student'[\s\S]*j\.employer_id = new\.student_id/)
+  assert.match(applicationAccessMigration, /drop policy if exists applications_employer_update/)
+  assert.match(applicationAccessMigration, /drop policy if exists applications_student_withdraw/)
+  assert.doesNotMatch(applicationAccessMigration, /create policy applications_(?:employer_update|student_withdraw)/)
+  assert.match(applicationAccessMigration, /student_withdraw_application[\s\S]*public\.current_user_is_student\(\)/)
+  assert.match(applicationAccessMigration, /student_respond_to_offer[\s\S]*public\.current_user_is_student\(\)/)
+  assert.doesNotMatch(applicationAccessMigration, /drop policy if exists applications_admin_all/)
 })
 
 test('employer verification documents require role-aware ownership', () => {
@@ -211,6 +236,25 @@ test('local RLS integration enforces role, ownership, recruitment scope, and pri
     const employer = await signIn(employerId, employerUser.user.email)
     const otherEmployer = await signIn(otherEmployerId, otherEmployerUser.user.email)
     const admin = await signIn(adminId, adminUser.user.email)
+
+    const { data: studentRole, error: studentRoleError } = await student.rpc('current_user_is_student')
+    assert.ifError(studentRoleError)
+    assert.equal(studentRole, true)
+    const { data: employerRole, error: employerRoleError } = await employer.rpc('current_user_is_student')
+    assert.ifError(employerRoleError)
+    assert.equal(employerRole, false)
+
+    const { error: crossAccountInsertError } = await student.from('applications').insert({
+      student_id: otherStudentId,
+      job_id: jobIds[0],
+    })
+    assert.ok(crossAccountInsertError)
+
+    const { error: selfApplicationError } = await student.from('applications').insert({
+      student_id: studentId,
+      job_id: legacyJob.id,
+    })
+    assert.ok(selfApplicationError)
 
     const { data: anonymousProfiles, error: anonymousError } = await anonymous.from('profiles').select('id')
     assert.ifError(anonymousError)

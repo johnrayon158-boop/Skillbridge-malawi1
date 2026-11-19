@@ -1,23 +1,14 @@
 import { supabase } from './supabase'
 import { createDebugReference } from '../utils/requestError'
+import { API_CONFIGURATION_ERROR, resolveApiBaseUrl } from '../utils/apiBaseUrl.js'
 
-const configuredApiBase = import.meta.env.VITE_AI_API_URL || import.meta.env.VITE_API_BASE_URL
-const isLoopbackApi = (() => {
-  if (!configuredApiBase || typeof window === 'undefined') return false
-  try {
-    return ['localhost', '127.0.0.1', '0.0.0.0', '[::1]'].includes(new URL(configuredApiBase, window.location.origin).hostname)
-  } catch {
-    return false
-  }
-})()
-const useConfiguredApi = configuredApiBase && !isLoopbackApi
-const AI_API_BASE = (useConfiguredApi
-  ? configuredApiBase
-  : import.meta.env.DEV && typeof window !== 'undefined'
-    ? window.location.origin
-    : typeof window !== 'undefined'
-      ? window.location.origin
-      : '').replace(/\/+$/, '')
+const AI_API_BASE = resolveApiBaseUrl({
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+  aiApiUrl: import.meta.env.VITE_AI_API_URL,
+  isDevelopment: import.meta.env.DEV,
+  location: typeof window === 'undefined' ? null : window.location,
+  developmentFallback: 'origin',
+})
 
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
 const safeDate = (value) => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null
@@ -107,6 +98,7 @@ async function fetchAiApi(url, options) {
 }
 
 async function request(endpoint, payload = {}, apiPath = '/api/ai') {
+  if (!AI_API_BASE) throw new Error(API_CONFIGURATION_ERROR)
   const accessToken = await getAccessToken()
   const response = await fetchAiApi(`${AI_API_BASE}${apiPath}/${endpoint}`, {
     method: 'POST',

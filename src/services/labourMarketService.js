@@ -115,8 +115,36 @@ export const labourMarketService = {
   },
 
   async getTrends(filters = {}) {
-    const jobs = await this.getRawJobs(filters)
+    const jobs = await this.getJobs(filters)
     return calculateTrendData(jobs)
+  },
+
+  async getJobs(filters = {}) {
+    const jobs = await this.getRawJobs(filters)
+    return jobs.filter(isActiveJob)
+  },
+
+  async getReport(filters = {}) {
+    const overview = await this.getOverview(filters)
+    return {
+      generatedAt: new Date().toISOString(),
+      sampleSize: overview.sampleSize,
+      dateCoverage: overview.dateCoverage,
+      metrics: {
+        jobs: overview.totalJobs,
+        employers: overview.totalEmployers,
+        sectors: overview.totalSectors,
+        skills: overview.totalUniqueSkills,
+      },
+      highlights: {
+        mostRequestedSkill: overview.mostRequestedSkill,
+        mostRequestedCareer: overview.mostRequestedCareer,
+        mostActiveSector: overview.mostActiveSector,
+      },
+      sectors: overview.sectors.items,
+      locations: overview.locations.items,
+      qualifications: overview.qualifications.items,
+    }
   },
 
   async getStudentInsights(studentId, targetCareer = '', skills = []) {

@@ -13,6 +13,7 @@ import {
 import { calculateCareerRecommendations } from './services/ai/aiScoringService.js'
 import { createAiRouteHandlers } from './services/ai/aiRouteHandlers.js'
 import { createCareerRecommendationHandler } from './services/ai/careerRecommendationHandler.js'
+import { isCvAnalysisProfileEligible } from './services/ai/cvAnalysisEligibility.js'
 import { buildCareerRecommendationRows } from './services/ai/careerRecommendationPersistence.js'
 import { requestGeminiJson } from './services/ai/geminiJson.js'
 import {
@@ -1285,7 +1286,9 @@ async function loadAnalysisContext(userId, targetType, targetId, includePortfoli
   ])
 
   const profile = safeQueryResult(profileResult, 'your profile')
-  if (profile.role !== 'student') throw new Error('CV analysis is available to student and graduate accounts.')
+  if (!isCvAnalysisProfileEligible(profile)) {
+    throw new Error('CV analysis is available to student and graduate accounts.')
+  }
   const education = safeQueryResult(educationResult, 'your education')
   const skills = filterSelectableSkillRows(safeQueryResult(skillsResult, 'your skills') || [])
   const projects = portfolioEvidence.projects

@@ -7,20 +7,22 @@ const repositoryName = process.env.GITHUB_REPOSITORY?.split('/')[1]
 const base = process.env.GITHUB_ACTIONS === 'true' && repositoryName
   ? `/${repositoryName}/`
   : '/'
+const apiProxy = {
+  target: 'http://127.0.0.1:4000',
+  configure(proxy) {
+    proxy.on('proxyReq', (proxyRequest) => {
+      proxyRequest.removeHeader('origin')
+    })
+  },
+}
 
 export default defineConfig({
   base,
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:4000',
-        configure(proxy) {
-          proxy.on('proxyReq', (proxyRequest) => {
-            proxyRequest.removeHeader('origin')
-          })
-        },
-      },
+      '/api': apiProxy,
+      '/health': apiProxy,
     },
   },
   preview: {

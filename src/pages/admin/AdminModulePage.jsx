@@ -1,6 +1,6 @@
 import { Activity, AlertTriangle, Archive, ArrowLeft, ArrowRight, BarChart3, BookOpen, BriefcaseBusiness, Building2, CalendarDays, Check, CheckCircle2, Download, ExternalLink, FileText, Gauge, GraduationCap, Layers3, ListChecks, Mail, MapPin, Plus, RefreshCw, Search, ShieldCheck, Sparkles, Target, Upload, UserRound, Users, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS } from '../../constants/database'
 import { useAuth } from '../../contexts/AuthContext'
 import { adminService } from '../../services/adminService'
@@ -29,6 +29,7 @@ import { parseCareerList, validateCareerDefinition } from '../../utils/careerDef
 import { getCertificateStatusLabel } from '../../utils/certificateWorkflow.js'
 import { isCertificateIndependentlyVerified } from '../../utils/certificateVerification.js'
 import { ADMIN_DASHBOARD_DATE_RANGES } from '../../utils/adminDashboardMetrics.js'
+import { validateAssessmentDraft } from '../../utils/assessmentEditorValidation.js'
 import {
   LEARNING_RESOURCE_DIFFICULTIES,
   LEARNING_RESOURCE_STATUSES,
@@ -1366,7 +1367,7 @@ function AssessmentDirectory() {
           </div>
         ))}</div>
       </Section> : null}
-      <Section title="Assessment library" icon={ListChecks} action={<span className="text-sm text-slate-500">{loading ? 'Loading…' : `${items.length} ${items.length === 1 ? 'assessment' : 'assessments'}`}</span>}>
+      <Section title="Assessment library" icon={ListChecks} action={<div className="flex flex-wrap items-center gap-3"><span className="text-sm text-slate-500">{loading ? 'Loading…' : `${items.length} ${items.length === 1 ? 'assessment' : 'assessments'}`}</span><Link to="/admin/assessments/create"><Button><Plus size={16} />New assessment</Button></Link></div>}>
         {currentResult?.error ? (
           <div className="space-y-3"><QueryError message={currentResult.error} /><Button variant="outline" size="sm" onClick={() => setRefreshKey((key) => key + 1)}><RefreshCw size={15} />Try again</Button></div>
         ) : loading ? (
@@ -1395,9 +1396,11 @@ function AssessmentDirectory() {
 }
 
 function AssessmentDetail({ id }) {
+  const location = useLocation()
   const [result, setResult] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [statusError, setStatusError] = useState('')
+  const [statusMessage, setStatusMessage] = useState(location.state?.assessmentSaveMessage || '')
   const [savingStatus, setSavingStatus] = useState(false)
   const requestKey = `${id}:${refreshKey}`
 
@@ -1418,9 +1421,13 @@ function AssessmentDetail({ id }) {
   const updateStatus = async (nextStatus) => {
     setSavingStatus(true)
     setStatusError('')
+    setStatusMessage('')
     try {
       await adminService.updateAssessmentStatus(assessment.id, nextStatus)
       setResult({ key: requestKey, assessment: { ...assessment, status: nextStatus }, error: '' })
+      setStatusMessage(nextStatus === 'published'
+        ? 'Assessment published and available to students.'
+        : `Assessment status changed to ${nextStatus}.`)
     } catch (updateError) {
       setStatusError(updateError.message || 'Unable to update assessment status.')
     } finally {
@@ -1434,16 +1441,185 @@ function AssessmentDetail({ id }) {
       <Header title="Assessment details" description="Review setup and participation. Correct answers are not displayed in the administration overview." back="/admin/assessments" />
       <Card className="overflow-hidden">
         <div className="bg-gradient-to-r from-sky-900 to-sky-700 p-5 text-white sm:p-7">
-          <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm font-medium uppercase tracking-wide text-sky-200">{assessment.assessment_type} assessment</p><h2 className="mt-2 text-2xl font-bold">{assessment.title}</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100">{assessment.description}</p></div><Badge tone={statusTone[assessment.status] || 'slate'}>{assessment.status || 'Unknown status'}</Badge></div>
+          <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm font-medium uppercase tracking-wide text-sky-200">{assessment.assessment_type} assessment</p><h2 className="mt-2 text-2xl font-bold">{assessment.title}</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100">{assessment.description}</p></div><div className="flex items-center gap-3"><Link to={`/admin/assessments/${assessment.id}/edit`}><Button variant="outline" className="border-white/40 bg-white/10 text-white hover:bg-white/20"><FileText size={16} />Edit assessment</Button></Link><Badge tone={statusTone[assessment.status] || 'slate'}>{assessment.status || 'Unknown status'}</Badge></div></div>
           <label className="mt-5 inline-flex flex-col gap-1"><span className="text-xs font-medium text-sky-100">Change availability</span><select className="rounded-lg border border-white/30 bg-white px-3 py-2 text-sm text-slate-800" value={assessment.status} disabled={savingStatus} onChange={(event) => updateStatus(event.target.value)}>{['draft', 'published', 'archived'].map((item) => <option key={item} value={item}>{item[0].toUpperCase() + item.slice(1)}</option>)}</select></label>
         </div>
         <dl className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4 sm:p-7">{[['Related skill/career', typeTarget], ['Difficulty', assessment.difficulty], ['Duration', assessment.duration_minutes ? `${assessment.duration_minutes} minutes` : null], ['Passing score', assessment.passing_score == null ? null : `${assessment.passing_score}%`]].map(([label, value]) => <div key={label}><dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{value || 'Not specified'}</dd></div>)}</dl>
       </Card>
       {statusError ? <QueryError message={statusError} /> : null}
+      {statusMessage ? <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{statusMessage}</p> : null}
       <div className="grid gap-4 sm:grid-cols-3"><Card className="p-5"><p className="text-sm text-slate-500">Questions</p><p className="mt-2 text-3xl font-bold text-slate-900">{assessment.assessment_questions?.length || 0}</p></Card><Card className="p-5"><p className="text-sm text-slate-500">Recorded attempts</p><p className="mt-2 text-3xl font-bold text-slate-900">{assessment.assessment_results?.length || 0}</p></Card><Card className="p-5"><p className="text-sm text-slate-500">Created</p><p className="mt-2 text-lg font-semibold text-slate-900">{assessment.created_at ? new Date(assessment.created_at).toLocaleDateString() : 'Not available'}</p></Card></div>
       <Section title="Question overview" icon={FileText}>
         {assessment.assessment_questions?.length ? <div className="divide-y divide-slate-100">{assessment.assessment_questions.map((question, index) => <div key={question.id} className="flex flex-wrap items-start justify-between gap-3 py-4 first:pt-0 last:pb-0"><div><p className="text-sm font-medium text-slate-800"><span className="mr-2 text-slate-400">{index + 1}.</span>{question.question}</p><p className="mt-1 text-xs capitalize text-slate-500">{String(question.question_type || 'question').replaceAll('_', ' ')}{question.difficulty ? ` · ${question.difficulty}` : ''}</p></div><Badge tone="slate">{question.points} {question.points === 1 ? 'point' : 'points'}</Badge></div>)}</div> : <EmptyState>Add questions before publishing this assessment. Only assessments with at least one question may be published.</EmptyState>}
       </Section>
+    </div>
+  )
+}
+
+function createEmptyAssessmentQuestion() {
+  return {
+    question: '',
+    question_type: 'multiple_choice',
+    options: ['', '', '', ''],
+    correct_answer: '',
+    points: 1,
+    difficulty: 'intermediate',
+    explanation: '',
+  }
+}
+
+function AssessmentEditor({ id }) {
+  const navigate = useNavigate()
+  const editing = Boolean(id)
+  const [assessment, setAssessment] = useState(null)
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    assessment_type: 'practice',
+    duration_minutes: '',
+    difficulty: '',
+    passing_score: '',
+  })
+  const [questions, setQuestions] = useState(editing ? [] : [createEmptyAssessmentQuestion()])
+  const [loadState, setLoadState] = useState({ loading: editing, error: '' })
+  const [formError, setFormError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!id) return undefined
+
+    let active = true
+    adminService.getAssessmentForEditing(id)
+      .then((loadedAssessment) => {
+        if (!active) return
+        setAssessment(loadedAssessment)
+        setForm({
+          title: loadedAssessment.title || '',
+          description: loadedAssessment.description || '',
+          assessment_type: loadedAssessment.assessment_type || 'practice',
+          duration_minutes: loadedAssessment.duration_minutes ?? '',
+          difficulty: loadedAssessment.difficulty || '',
+          passing_score: loadedAssessment.passing_score ?? '',
+        })
+        const supportsQuestionEditing = !loadedAssessment.assessment_results?.length
+          && (loadedAssessment.assessment_questions || []).every((question) => question.question_type === 'multiple_choice')
+        setQuestions(supportsQuestionEditing
+          ? (loadedAssessment.assessment_questions || []).map((question) => ({
+            ...question,
+            options: Array.isArray(question.options) ? question.options : [],
+            correct_answer: typeof question.correct_answer === 'string'
+              ? question.correct_answer
+              : String(question.correct_answer ?? ''),
+          }))
+          : [])
+        setLoadState({ loading: false, error: '' })
+      })
+      .catch((loadError) => {
+        if (active) setLoadState({ loading: false, error: loadError.message || 'Unable to load assessment editor data.' })
+      })
+    return () => { active = false }
+  }, [id])
+
+  if (loadState.loading) return <div className="space-y-4"><div className="h-20 animate-pulse rounded-2xl bg-slate-100" /><div className="h-96 animate-pulse rounded-2xl bg-slate-100" /></div>
+  if (loadState.error) return <div className="space-y-4"><Header title="Assessment editor" description="Create or update an assessment draft." back={editing ? `/admin/assessments/${id}` : '/admin/assessments'} /><QueryError message={loadState.error} /><Button variant="outline" onClick={() => navigate('/admin/assessments')}>Back to assessments</Button></div>
+
+  const editableQuestions = !editing || (!assessment.assessment_results?.length
+    && (assessment.assessment_questions || []).every((question) => question.question_type === 'multiple_choice'))
+  const publishedAssessment = assessment?.status === 'published'
+  const updateForm = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }))
+  const updateQuestion = (index, field, value) => setQuestions((current) => current.map((question, questionIndex) => (
+    questionIndex === index ? { ...question, [field]: value } : question
+  )))
+  const updateQuestionOption = (index, optionIndex, value) => setQuestions((current) => current.map((question, questionIndex) => (
+    questionIndex === index
+      ? { ...question, options: question.options.map((option, currentOptionIndex) => currentOptionIndex === optionIndex ? value : option) }
+      : question
+  )))
+
+  const save = async (event) => {
+    event.preventDefault()
+    setFormError('')
+    if (publishedAssessment) {
+      setFormError('Move the assessment to draft before editing it.')
+      return
+    }
+
+    const changes = {
+      ...(id ? { id } : {}),
+      ...form,
+      questions: editableQuestions ? questions : null,
+    }
+    const validationError = validateAssessmentDraft(changes)
+    if (validationError) {
+      setFormError(validationError)
+      return
+    }
+
+    setSaving(true)
+    try {
+      const savedId = await adminService.saveAssessment(changes)
+      const savedStatus = assessment?.status || 'draft'
+      const assessmentSaveMessage = savedStatus === 'draft'
+        ? 'Draft saved - not visible to students until published.'
+        : `Assessment changes saved; status remains ${savedStatus}.`
+      navigate(`/admin/assessments/${savedId}`, { state: { assessmentSaveMessage } })
+    } catch (saveError) {
+      setFormError(saveError.message || 'Unable to save assessment.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <Header title={editing ? 'Edit assessment' : 'Create assessment'} description="Assessment saves never change publication status. New assessments are saved as drafts and remain unavailable to students until published." back={editing ? `/admin/assessments/${id}` : '/admin/assessments'} />
+      {publishedAssessment ? <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">This assessment is published. Move it to draft from its details page before editing.</p> : null}
+      <form onSubmit={save} className="space-y-6">
+        <Section title="Assessment details" icon={editing ? FileText : Plus}>
+          <div className="space-y-4">
+            <label className="block"><span className="mb-1.5 block text-sm font-medium text-slate-700">Title <span className="text-rose-600">*</span></span><input required maxLength={200} className={INPUT} value={form.title} onChange={updateForm('title')} /></label>
+            <label className="block"><span className="mb-1.5 block text-sm font-medium text-slate-700">Description <span className="text-rose-600">*</span></span><textarea required maxLength={5000} className={`${INPUT} min-h-28`} value={form.description} onChange={updateForm('description')} /></label>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="block"><span className="mb-1.5 block text-sm font-medium text-slate-700">Assessment type</span><select className={INPUT} value={form.assessment_type} onChange={updateForm('assessment_type')}>{['skill', 'career', 'job', 'practice'].map((type) => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}</select></label>
+              <label className="block"><span className="mb-1.5 block text-sm font-medium text-slate-700">Duration (minutes)</span><input type="number" min="1" step="1" className={INPUT} value={form.duration_minutes} onChange={updateForm('duration_minutes')} /></label>
+              <label className="block"><span className="mb-1.5 block text-sm font-medium text-slate-700">Difficulty</span><input maxLength={50} className={INPUT} value={form.difficulty} onChange={updateForm('difficulty')} placeholder="Optional" /></label>
+              <label className="block"><span className="mb-1.5 block text-sm font-medium text-slate-700">Passing score (%)</span><input type="number" min="0" max="100" step="1" className={INPUT} value={form.passing_score} onChange={updateForm('passing_score')} /></label>
+            </div>
+            <p className="text-xs text-slate-500">Status is managed separately from this form. Saving will not publish or unpublish the assessment.</p>
+          </div>
+        </Section>
+
+        <Section title="Multiple-choice questions" icon={ListChecks} action={editableQuestions ? <Button type="button" variant="outline" onClick={() => setQuestions((current) => [...current, createEmptyAssessmentQuestion()])}><Plus size={15} />Add question</Button> : null}>
+          {!editableQuestions ? (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-600">{assessment.assessment_results?.length ? 'Questions are locked because students have recorded attempts. Assessment details can still be updated without changing questions.' : 'This assessment contains question types not supported by this editor. Its questions are preserved while assessment details are edited.'}</p>
+              {assessment.assessment_questions?.length ? <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-700">{assessment.assessment_questions.map((question) => <li key={question.id}>{question.question}</li>)}</ol> : null}
+            </div>
+          ) : questions.length ? (
+            <div className="space-y-4">
+              {questions.map((question, index) => (
+                <fieldset key={question.id || index} className="space-y-4 rounded-xl border border-slate-200 p-4">
+                  <legend className="px-1 text-sm font-semibold text-slate-800">Question {index + 1}</legend>
+                  <div className="flex justify-end"><Button type="button" variant="ghost" size="sm" onClick={() => setQuestions((current) => current.filter((_, questionIndex) => questionIndex !== index))}><X size={15} />Remove question</Button></div>
+                  <label className="block"><span className="mb-1.5 block text-sm font-medium text-slate-700">Question text <span className="text-rose-600">*</span></span><textarea className={`${INPUT} min-h-20`} value={question.question} onChange={(event) => updateQuestion(index, 'question', event.target.value)} /></label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {question.options.map((option, optionIndex) => <label key={optionIndex} className="block"><span className="mb-1.5 block text-sm font-medium text-slate-700">Option {optionIndex + 1}</span><input className={INPUT} value={option} onChange={(event) => updateQuestionOption(index, optionIndex, event.target.value)} /></label>)}
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <label className="block"><span className="mb-1.5 block text-sm font-medium text-slate-700">Correct answer <span className="text-rose-600">*</span></span><select className={INPUT} value={question.correct_answer} onChange={(event) => updateQuestion(index, 'correct_answer', event.target.value)}><option value="">Choose an option</option>{question.options.map((option, optionIndex) => option.trim() ? <option key={optionIndex} value={option}>{`Option ${optionIndex + 1}: ${option}`}</option> : null)}</select></label>
+                    <label className="block"><span className="mb-1.5 block text-sm font-medium text-slate-700">Points</span><input type="number" min="1" max="1000" step="1" className={INPUT} value={question.points} onChange={(event) => updateQuestion(index, 'points', event.target.value)} /></label>
+                    <label className="block"><span className="mb-1.5 block text-sm font-medium text-slate-700">Difficulty</span><input maxLength={50} className={INPUT} value={question.difficulty || ''} onChange={(event) => updateQuestion(index, 'difficulty', event.target.value)} /></label>
+                  </div>
+                  <label className="block"><span className="mb-1.5 block text-sm font-medium text-slate-700">Explanation (optional)</span><textarea className={`${INPUT} min-h-20`} value={question.explanation || ''} onChange={(event) => updateQuestion(index, 'explanation', event.target.value)} /></label>
+                </fieldset>
+              ))}
+            </div>
+          ) : <p className="text-sm text-slate-600">No questions added. Add questions before publishing; assessments without questions cannot be published.</p>}
+        </Section>
+
+        {formError ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{formError}</p> : null}
+        <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={() => navigate(editing ? `/admin/assessments/${id}` : '/admin/assessments')}>Cancel</Button><Button type="submit" disabled={saving || publishedAssessment}><CheckCircle2 size={16} />{saving ? 'Saving…' : editing ? 'Save changes' : 'Save draft'}</Button></div>
+      </form>
     </div>
   )
 }
@@ -3489,4 +3665,4 @@ function InterviewPolicyReportsView() {
   </div>
 }
 
-export default function AdminModulePage({ mode = 'dashboard' }) { const { id } = useParams(); const { pathname } = useLocation(); const content = mode === 'dashboard' ? <AdminDashboard /> : mode === 'users' ? <UsersView detailId={id} /> : mode === 'employers' ? <EmployersView detailId={id} /> : mode === 'employer-verifications' ? <EmployerVerificationReviewsView /> : mode === 'interview-reports' ? <InterviewPolicyReportsView /> : mode === 'jobs' ? <JobsView detailId={id} /> : mode === 'skills' ? <SkillsCatalogView /> : mode === 'careers' ? <CareerAdminView detailId={id} editing={pathname.endsWith('/edit')} creating={pathname.endsWith('/create')} /> : mode === 'learning' ? <LearningAdminView id={id} editing={pathname.endsWith('/edit')} creating={pathname.endsWith('/create')} /> : mode === 'opportunities' ? <CareerOpportunityAdminView /> : mode === 'certificates' ? <CertificateReviewsView /> : mode === 'evaluation' ? <EvaluationReportView /> : mode === 'assessments' ? pathname.endsWith('/create') ? <Navigate to="/admin/assessments" replace /> : pathname.endsWith('/edit') ? <Navigate to={`/admin/assessments/${id}`} replace /> : <AssessmentsAdminView id={id} /> : mode === 'applications' ? <ApplicationsAdminView id={id} /> : mode === 'audit' ? <AuditLogsView /> : mode === 'reports' ? <ReportsAdminView /> : mode === 'settings' ? <AdminSettingsView /> : mode === 'analytics' ? <AnalyticsView /> : mode === 'data-quality' ? <DataQualityView /> : mode === 'health' ? <SystemHealthView /> : mode === 'security' ? <SecurityOverviewView /> : mode === 'ai' ? <AiMonitoringView /> : mode === 'labour-market' ? <LabourMarketModulePage /> : <SimpleAdminList mode={mode} />; return <AppShell title={CONFIG[mode]?.[0] || 'Administration'} subtitle={CONFIG[mode]?.[1] || ''} showBackButton={mode === 'dashboard'}>{content}</AppShell> }
+export default function AdminModulePage({ mode = 'dashboard' }) { const { id } = useParams(); const { pathname } = useLocation(); const content = mode === 'dashboard' ? <AdminDashboard /> : mode === 'users' ? <UsersView detailId={id} /> : mode === 'employers' ? <EmployersView detailId={id} /> : mode === 'employer-verifications' ? <EmployerVerificationReviewsView /> : mode === 'interview-reports' ? <InterviewPolicyReportsView /> : mode === 'jobs' ? <JobsView detailId={id} /> : mode === 'skills' ? <SkillsCatalogView /> : mode === 'careers' ? <CareerAdminView detailId={id} editing={pathname.endsWith('/edit')} creating={pathname.endsWith('/create')} /> : mode === 'learning' ? <LearningAdminView id={id} editing={pathname.endsWith('/edit')} creating={pathname.endsWith('/create')} /> : mode === 'opportunities' ? <CareerOpportunityAdminView /> : mode === 'certificates' ? <CertificateReviewsView /> : mode === 'evaluation' ? <EvaluationReportView /> : mode === 'assessments' ? pathname.endsWith('/create') ? <AssessmentEditor key="create" /> : pathname.endsWith('/edit') ? <AssessmentEditor key={id} id={id} /> : <AssessmentsAdminView id={id} /> : mode === 'applications' ? <ApplicationsAdminView id={id} /> : mode === 'audit' ? <AuditLogsView /> : mode === 'reports' ? <ReportsAdminView /> : mode === 'settings' ? <AdminSettingsView /> : mode === 'analytics' ? <AnalyticsView /> : mode === 'data-quality' ? <DataQualityView /> : mode === 'health' ? <SystemHealthView /> : mode === 'security' ? <SecurityOverviewView /> : mode === 'ai' ? <AiMonitoringView /> : mode === 'labour-market' ? <LabourMarketModulePage /> : <SimpleAdminList mode={mode} />; return <AppShell title={CONFIG[mode]?.[0] || 'Administration'} subtitle={CONFIG[mode]?.[1] || ''} showBackButton={mode === 'dashboard'}>{content}</AppShell> }

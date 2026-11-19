@@ -14,31 +14,31 @@ import {
 import { calculateEvaluationReport } from '../utils/evaluationMetrics.js'
 import { evaluateSkillsGapCases } from '../utils/skillsGapEvaluation.js'
 import { validateLearningResource } from '../utils/learningResourceValidation.js'
+import { validateAssessmentDraft } from '../utils/assessmentEditorValidation.js'
 import { normalizeCertificateReview } from '../utils/certificateWorkflow.js'
 import { getAdminDashboardData } from './adminDashboardData.js'
+import { API_CONFIGURATION_ERROR, resolveApiBaseUrl } from '../utils/apiBaseUrl.js'
 
 function getApiBaseUrl() {
-  const configuredUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_AI_API_URL
-  if (configuredUrl) {
-    try {
-      const url = new URL(configuredUrl, window.location.origin)
-      if (import.meta.env.PROD && ['localhost', '127.0.0.1', '0.0.0.0', '[::1]'].includes(url.hostname)) {
-        return window.location.origin
-      }
-    } catch {
-      return configuredUrl.replace(/\/+$/, '')
-    }
-    return configuredUrl.replace(/\/+$/, '')
-  }
-  return import.meta.env.DEV
-    ? `${window.location.protocol}//${window.location.hostname}:4000`
-    : window.location.origin
+  return resolveApiBaseUrl({
+    apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+    aiApiUrl: import.meta.env.VITE_AI_API_URL,
+    isDevelopment: import.meta.env.DEV,
+    location: typeof window === 'undefined' ? null : window.location,
+  })
 }
 
 async function getApiSecurityConfiguration() {
+  const apiBaseUrl = getApiBaseUrl()
+  if (!apiBaseUrl) {
+    return {
+      corsConfiguration: { available: false, reason: API_CONFIGURATION_ERROR },
+      rateLimitConfiguration: null,
+    }
+  }
   let response
   try {
-    response = await fetch(`${getApiBaseUrl()}/health`, { headers: { Accept: 'application/json' } })
+    response = await fetch(`${apiBaseUrl}/health`, { headers: { Accept: 'application/json' } })
   } catch {
     return {
       corsConfiguration: { available: false, reason: 'The API health endpoint could not be reached from this browser.' },
@@ -436,7 +436,9 @@ export const adminService = {
   },
 
   async extractSkillsPdf(file, accessToken) {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_AI_API_URL || 'http://localhost:4000'}/api/admin/skills/extract-pdf`, {
+    const apiBaseUrl = getApiBaseUrl()
+    if (!apiBaseUrl) throw new Error(API_CONFIGURATION_ERROR)
+    const response = await fetch(`${apiBaseUrl}/api/admin/skills/extract-pdf`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -845,6 +847,47 @@ export const adminService = {
     return requireData(data, error, 'Unable to load this assessment.')
   },
 
+  async getAssessmentForEditing(id) {
+    const { data, error } = await supabase.from('assessments')
+      .select('id, title, description, assessment_type, duration_minutes, difficulty, passing_score, status, skill_id, career_id, assessment_questions(id, question, question_type, options, correct_answer, points, difficulty, explanation), assessment_results(id)')
+      .eq('id', id)
+      .single()
+    return requireData(data, error, 'Unable to load assessment editor data.')
+  },
+
+  async saveAssessment(assessment) {
+    const validationError = validateAssessmentDraft(assessment)
+    if (validationError) throw new Error(validationError)
+
+    const normalizedAssessment = {
+      title: String(assessment.title).trim(),
+      description: String(assessment.description).trim(),
+      assessment_type: assessment.assessment_type,
+      duration_minutes: assessment.duration_minutes === '' || assessment.duration_minutes == null
+        ? null
+        : Number(assessment.duration_minutes),
+      difficulty: String(assessment.difficulty || '').trim() || null,
+      passing_score: assessment.passing_score === '' || assessment.passing_score == null
+        ? null
+        : Number(assessment.passing_score),
+    }
+    const questions = assessment.questions == null ? null : assessment.questions.map((question) => ({
+      question: String(question.question).trim(),
+      question_type: 'multiple_choice',
+      options: question.options.map((option) => String(option).trim()).filter(Boolean),
+      correct_answer: String(question.correct_answer).trim(),
+      points: Number(question.points),
+      difficulty: String(question.difficulty || '').trim() || null,
+      explanation: String(question.explanation || '').trim() || null,
+    }))
+    const { data, error } = await supabase.rpc('admin_save_assessment', {
+      p_assessment_id: assessment.id || null,
+      p_assessment: normalizedAssessment,
+      p_questions: questions,
+    })
+    return requireData(data, error, 'Unable to save assessment.')
+  },
+
   async updateAssessmentStatus(id, status) {
     if (!['draft', 'published', 'archived'].includes(status)) {
       throw new Error('Choose a valid assessment status.')
@@ -1206,9 +1249,12 @@ export const adminService = {
     if (sessionError) throw new Error('Unable to verify your administrator session.')
     if (!session?.access_token) throw new Error('Sign in with an administrator account to view system health.')
 
+    const apiBaseUrl = getApiBaseUrl()
+    if (!apiBaseUrl) return unavailableSystemHealth(API_CONFIGURATION_ERROR)
+
     let response
     try {
-      response = await fetch(`${getApiBaseUrl()}/api/admin/system-health`, {
+      response = await fetch(`${apiBaseUrl}/api/admin/system-health`, {
         headers: {
           Accept: 'application/json',
           Authorization: `Bearer ${session.access_token}`,

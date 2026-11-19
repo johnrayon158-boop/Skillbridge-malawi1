@@ -5,6 +5,7 @@ import {
   filterAssessmentResultSkillRows,
   filterSelectableSkillRows,
 } from '../utils/skillCatalog'
+import { API_CONFIGURATION_ERROR, resolveApiBaseUrl } from '../utils/apiBaseUrl.js'
 
 export const INTERNSHIP_TYPES = [
   ['industrial_attachment', 'Industrial attachment'],
@@ -17,10 +18,16 @@ export const INTERNSHIP_TYPES = [
 ]
 
 const OPEN_EMPLOYMENT_TYPES = ['internship', 'graduate', 'temporary', 'part_time', 'volunteer']
-const PUBLIC_SEARCH_API = import.meta.env.VITE_AI_API_URL || 'http://localhost:4000'
+const PUBLIC_SEARCH_API = resolveApiBaseUrl({
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+  aiApiUrl: import.meta.env.VITE_AI_API_URL,
+  isDevelopment: import.meta.env.DEV,
+  location: typeof window === 'undefined' ? null : window.location,
+})
 
 export const internshipService = {
   async searchPublicOpportunities() {
+    if (!PUBLIC_SEARCH_API) throw new Error(API_CONFIGURATION_ERROR)
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
     if (sessionError || !sessionData.session?.access_token) {
       throw new Error('Your session has expired. Please sign in again.')

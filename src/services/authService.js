@@ -4,6 +4,7 @@ import {
   getSupabaseConfigMessage,
   hasSupabaseConfig,
   supabase,
+  supabaseAuthStorage,
 } from './supabase'
 
 const ensureSupabaseConfig = () => {
@@ -36,16 +37,13 @@ export const authService = {
   async signIn({ email, password, rememberMe = true }) {
     try {
       ensureSupabaseConfig()
+      supabaseAuthStorage.setRememberMe(rememberMe)
 
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error) {
         reportSignInFailure()
         return { data: null, error: getFriendlyAuthError(error) }
-      }
-
-      if (!rememberMe) {
-        await supabase.auth.setSession({ access_token: data.session.access_token, refresh_token: data.session.refresh_token })
       }
 
       const profile = data?.user ? await supabase

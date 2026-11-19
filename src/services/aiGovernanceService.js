@@ -1,6 +1,14 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_AI_API_URL || 'http://localhost:4000'
+import { API_CONFIGURATION_ERROR, resolveApiBaseUrl } from '../utils/apiBaseUrl.js'
+
+const API_BASE = resolveApiBaseUrl({
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+  aiApiUrl: import.meta.env.VITE_AI_API_URL,
+  isDevelopment: import.meta.env.DEV,
+  location: typeof window === 'undefined' ? null : window.location,
+})
 
 async function request(path, options = {}) {
+  if (!API_BASE) throw new Error(API_CONFIGURATION_ERROR)
   const response = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,

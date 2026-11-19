@@ -21,11 +21,11 @@ The Render blueprint configures the API CORS allowlist for the GitHub Pages orig
 
 ## Run locally
 
-Run `npm run dev -- --host 0.0.0.0` to start the frontend and API together. The Vite development server proxies `/api` requests to the local API, so the app also works when opened from another device on the same network without adding that device's address to the API CORS allowlist.
+Run `npm run dev -- --host 0.0.0.0` to start the frontend and API together. In development, browser API clients use the same-origin Vite proxy, which forwards `/api` and `/health` requests to the local API even when a production `VITE_API_BASE_URL` is configured. This also lets the app work from another device on the same network without adding that device's address to the API CORS allowlist.
 
 ## Deploy frontend and API to Vercel
 
-The Vercel deployment uses the Vite static build plus the shared Node.js function in `api/index.js`; `vercel.json` rewrites nested `/api/*` routes to this function while preserving their original paths. It does not start the standalone server process. The Career Assistant uses same-origin `/api` routes when `VITE_API_BASE_URL` is unset.
+The Vercel deployment uses the Vite static build plus the shared Node.js function in `api/index.js`; `vercel.json` rewrites nested `/api/*` routes to this function while preserving their original paths. It does not start the standalone server process. Browser API clients use same-origin routes when `VITE_API_BASE_URL` is unset; this is intended for Vercel's API function. Static hosting such as GitHub Pages must configure the public API URL.
 
 Set these Vercel environment variables for the required environments, then redeploy:
 
