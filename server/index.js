@@ -1723,6 +1723,7 @@ async function handleCvAnalysis(req, res) {
 }
 
 async function generateGeminiReply(question, summary, conversationHistory = [], req) {
+  const providerDeadline = Date.now() + 30000
   const needsLiveJobs = isJobSearchQuestion(question)
   const prompt = `
 You are SkillBridge Assistant, a helpful general-purpose AI assistant available through SkillBridge Malawi.
@@ -1763,7 +1764,8 @@ Use an empty actions array when no SkillBridge action is relevant, and an empty 
       const generated = await requestGeminiJson({
         prompt: `${prompt}\n\nThe current date is ${new Date().toISOString().slice(0, 10)}. Search the web now for current opportunities relevant to this request. Include the original source URL for each listing.`,
         validate: normalizeChatResponse,
-        send: (input) => fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+        deadlineAt: providerDeadline,
+        send: (input, { timeoutMs }) => fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1774,7 +1776,7 @@ Use an empty actions array when no SkillBridge action is relevant, and an empty 
             input,
             tools: [{ type: 'google_search' }],
           }),
-          signal: AbortSignal.timeout(20000),
+          signal: AbortSignal.timeout(timeoutMs),
         }),
       })
       updateAiProviderMetadata(req, generated, 'gemini-3.8-flash')
@@ -1820,7 +1822,8 @@ Use an empty actions array when no SkillBridge action is relevant, and an empty 
     const generated = await requestGeminiJson({
       prompt,
       validate: normalizeChatResponse,
-      send: (input) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      deadlineAt: providerDeadline,
+      send: (input, { timeoutMs }) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1834,7 +1837,7 @@ Use an empty actions array when no SkillBridge action is relevant, and an empty 
             responseMimeType: 'application/json',
           },
         }),
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(timeoutMs),
       }),
     })
     updateAiProviderMetadata(req, generated, model)

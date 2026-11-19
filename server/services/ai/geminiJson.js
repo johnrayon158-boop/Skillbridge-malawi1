@@ -18,7 +18,7 @@ export function classifyGeminiProviderError(status, providerCode = '') {
   return 'provider_error'
 }
 
-export async function requestGeminiJson({ prompt, send, validate }) {
+export async function requestGeminiJson({ prompt, send, validate, deadlineAt }) {
   let currentPrompt = prompt
   let failureReason = 'empty_response'
   let lastMetadata = { model: null, responseId: null, httpStatus: null, providerErrorCode: null }
@@ -26,7 +26,18 @@ export async function requestGeminiJson({ prompt, send, validate }) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     let response
     try {
-      response = await send(currentPrompt)
+      const timeoutMs = deadlineAt === undefined
+        ? undefined
+        : Math.min(20000, deadlineAt - Date.now())
+      if (timeoutMs !== undefined && timeoutMs <= 0) {
+        return {
+          value: null,
+          status: 'unavailable',
+          reason: 'timeout',
+          ...lastMetadata,
+        }
+      }
+      response = await send(currentPrompt, { timeoutMs })
     } catch (error) {
       const errorDetails = `${error?.name || ''} ${error?.code || ''}`
       return {

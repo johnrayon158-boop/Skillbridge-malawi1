@@ -141,6 +141,35 @@ test('classifies network timeouts separately from other transport failures', asy
   assert.doesNotMatch(JSON.stringify(timeout), /private request details/)
 })
 
+test('bounds Gemini retries to the remaining chat-generation deadline', async () => {
+  let sendCount = 0
+  const expired = await requestGeminiJson({
+    prompt: 'Return JSON.',
+    deadlineAt: Date.now() - 1,
+    validate: () => null,
+    send: async () => {
+      sendCount += 1
+      return jsonResponse({})
+    },
+  })
+
+  assert.equal(expired.status, 'unavailable')
+  assert.equal(expired.reason, 'timeout')
+  assert.equal(sendCount, 0)
+
+  let timeoutMs
+  await requestGeminiJson({
+    prompt: 'Return JSON.',
+    deadlineAt: Date.now() + 5000,
+    validate: () => null,
+    send: async (_prompt, options) => {
+      timeoutMs = options.timeoutMs
+      return jsonResponse({ error: { status: 'UNAVAILABLE' } }, 503)
+    },
+  })
+  assert.ok(timeoutMs > 0 && timeoutMs <= 5000)
+})
+
 test('normalizes deterministic AI feature schemas and rejects malformed results', () => {
   assert.ok(normalizeCareerRecommendations({
     recommendations: [{ career_id: 'career-1', title: 'Analyst', overall_score: 72 }],
